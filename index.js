@@ -28,13 +28,15 @@ app.use((req, res, next) => {
 });
 
 import actionLogRoute from "./src/routes/actionLogRoute.js"
- 
+import newsPaperJobAllocationRoute from "./src/routes/newsPaperJobAllocationRoutes.js"
+
 
 
 
 
 
 app.use("/actionLogs", actionLogRoute);
+app.use("/newsPaperJobAllocation", newsPaperJobAllocationRoute);
 
 
 
