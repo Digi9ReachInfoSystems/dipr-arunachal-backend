@@ -12,7 +12,7 @@ import {
 import moment from 'moment-timezone';
 export const updateApproveCvAndTimeAllotment = async (req, res) => {
     try {
-        const { documentIds, addressTo } = req.body;
+        const { documentIds, addressTo, to, advertisementNumber } = req.body;
 
         if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
             return res.status(400).json({
@@ -29,6 +29,7 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
 
         let notifications = [];
         let notificationApproved = []
+        let newsPaperList=[]
 
         for (const docId of documentIds) {
             if (typeof docId !== "string" || docId.trim() === "") {
@@ -56,7 +57,10 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
                     if (userSnap.exists()) {
                         const userData = userSnap.data();
                         const userEmail = userData.email;
-                        const userName = userData.display_name;
+                        const paperName = userData.display_name;
+                        if(paperName){
+                            newsPaperList.push(paperName)
+                        }
                         if (userEmail) {
                             notifications.push({
                                 to: userEmail,
@@ -75,10 +79,10 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
         }
 
         await batch.commit();
-
+        // send mail to user
         notifications.forEach(async (mail) => {
             try {
-                await fetch("https://nodemailer-henna.vercel.app/email/release-order", {
+                await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(mail),
@@ -88,20 +92,19 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
                 console.error(`Failed to send email to ${mail.to}:`, err.message);
             }
         });
-
+        // send mail to vendor
         const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
         if (!usersEmailSnap.empty) {
             const docSnap = usersEmailSnap.docs[0]; // only one doc
             const usersEmailData = docSnap.data();
-            const to = usersEmailData['technicalassistantadvtgmailcom'];
-            console.log(to)
+            const toMail = usersEmailData['technicalassistantadvtgmailcom'];
             notificationApproved.forEach(async (mail) => {
                 try {
-                    await fetch("https://nodemailer-henna.vercel.app/email/accepting", {
+                    await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                            to,
+                            to: toMail,
                             roNumber: mail.roNumber,
                             result: mail.result,
                             resultComment: mail.resultComment,
@@ -115,6 +118,24 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
                     );
                 }
             });
+        }
+
+        //send mail department 
+        try {
+            const respone = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: to,
+                    advertisementNumber: advertisementNumber,
+                    cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+                    listOfNewspapers: newsPaperList
+
+                }),
+            });
+            console.log(`Email sent to department`, to);
+        } catch (err) {
+            console.error(`Failed to send email to ${to}:`, err.message);
         }
 
 
