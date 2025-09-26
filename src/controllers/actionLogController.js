@@ -226,7 +226,7 @@ export const getAllActionLogs = async (req, res) => {
     if (islogin !== "all") constraints.push(where("islogin", "==", islogin === "true"));
     if (rodocref !== "all") constraints.push(where("rodocref", "==", rodocref));
     if (user_role !== "all") constraints.push(where("user_role", "==", user_role));
-    if (action !== "all") constraints.push(where("action", "==", action));
+    if (action !== "all") constraints.push(where("action", "==", Number(action)));
     if (status !== "all") constraints.push(where("status", "==", status));
     if (platform !== "all") constraints.push(where("platform", "==", platform));
     if (screen !== "all") constraints.push(where("screen", "==", screen));
