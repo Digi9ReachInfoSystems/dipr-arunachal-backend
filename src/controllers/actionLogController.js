@@ -269,13 +269,13 @@ export const getAllActionLogs = async (req, res) => {
       data: logs,
     });
   } catch (error) {
+    console.log("Error in getAllActionLogs:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
 
 
-// export const getAllActionLogs = async (req, res) => {
 //   try {
 //     const {
 //       user_ref,
