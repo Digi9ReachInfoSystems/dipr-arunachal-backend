@@ -47,6 +47,7 @@ export const createActionLog = async (req, res) => {
     const docRef = await addDoc(actionLogsRef, { ...log });
     res.status(201).json({ success: true, message: "ActionLog created", id: docRef.id });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ success: false, message: "error in creating action log", error: error.message });
   }
 };
@@ -372,7 +373,7 @@ export const getAllActionLogs = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in getAllActionLogs:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
   }
 };
 
@@ -386,12 +387,13 @@ export const getActionLogById = async (req, res) => {
     const snapshot = await getDoc(logRef);
 
     if (!snapshot.exists()) {
-      return res.status(404).json({ message: "ActionLog not found" });
+      return res.status(404).json({success: false, message: "ActionLog not found" });
     }
 
-    res.status(200).json({ id: snapshot.id, ...snapshot.data() });
+    res.status(200).json({success: true, id: snapshot.id, data:{...snapshot.data()} });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error in getActionLogById:", error);
+    res.status(500).json({success: false, error: error.message });
   }
 };
 
@@ -400,8 +402,9 @@ export const deleteActionLog = async (req, res) => {
   try {
     const logRef = doc(db, "actionLogs", req.params.id);
     await deleteDoc(logRef);
-    res.status(200).json({ message: "ActionLog deleted successfully" });
+    res.status(200).json({success: true, message: "ActionLog deleted successfully" });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error in deleteActionLog:", error);
+    res.status(500).json({success: false, message: "Internal server error", error: error.message });
   }
 };
