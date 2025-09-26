@@ -4,12 +4,15 @@ import {
     getDoc,
     writeBatch,
     serverTimestamp,
+    getDocs,
+    collection,
+
 
 } from 'firebase/firestore';
 import moment from 'moment-timezone';
 export const updateApproveCvAndTimeAllotment = async (req, res) => {
     try {
-        const { documentIds } = req.body;
+        const { documentIds, addressTo } = req.body;
 
         if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
             return res.status(400).json({
@@ -25,6 +28,7 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
             .format("DD MMMM YYYY [at] HH:mm:ss [UTC+5:30]");
 
         let notifications = [];
+        let notificationApproved = []
 
         for (const docId of documentIds) {
             if (typeof docId !== "string" || docId.trim() === "") {
@@ -57,8 +61,13 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
                             notifications.push({
                                 to: userEmail,
                                 roNumber: roNumber,
-                                addressTo: userName || "User",
+                                addressTo: addressTo || "User",
                             });
+                            notificationApproved.push({
+                                roNumber: roNumber,
+                                result: "approved",
+                                resultComment: "and sent for approval to the vendor.",
+                            })
                         }
                     }
                 }
@@ -79,6 +88,35 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
                 console.error(`Failed to send email to ${mail.to}:`, err.message);
             }
         });
+
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        if (!usersEmailSnap.empty) {
+            const docSnap = usersEmailSnap.docs[0]; // only one doc
+            const usersEmailData = docSnap.data();
+            const to = usersEmailData['technicalassistantadvtgmailcom'];
+            console.log(to)
+            notificationApproved.forEach(async (mail) => {
+                try {
+                    await fetch("https://nodemailer-henna.vercel.app/email/accepting", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            to,
+                            roNumber: mail.roNumber,
+                            result: mail.result,
+                            resultComment: mail.resultComment,
+                        }),
+                    });
+                    console.log(`Accepting email sent to ${to} for RO ${mail.roNumber}`);
+                } catch (err) {
+                    console.error(
+                        `Failed to send accepting email to ${to}:`,
+                        err.message
+                    );
+                }
+            });
+        }
+
 
         res.status(200).json({
             success: true,
