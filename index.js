@@ -22,7 +22,7 @@ app.use((req, res, next) => {
     req.headers["x-real-ip"] ||                      // fallback
     req.socket.remoteAddress;                        // fallback
 
-  console.log("Client IP:", clientIp);
+//   console.log("Client IP:", clientIp);
   req.clientIp = clientIp; // you can save it in your ActionLog
   next();
 });
@@ -44,7 +44,7 @@ app.use("/actionLogs", actionLogRoute);
 
 
 
-app.get("/health", (req, res) => {
+app.get("/", (req, res) => {
     res.send("Server is running healthy");
 });
 
