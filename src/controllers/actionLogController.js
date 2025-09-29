@@ -23,7 +23,7 @@ import { AppError, handleError } from "../utils/errorHandler.js";
 // ✅ Create ActionLog
 export const createActionLog = async (req, res) => {
   try {
-    console.log(req.body);
+    // console.log(req.body);
     if (
       req.body.platform &&
       !["iOS", "Android", "Web"].includes(req.body.platform)
@@ -42,6 +42,33 @@ export const createActionLog = async (req, res) => {
         allowed: ["Manual", "Automatic"],
       });
     }
+    if (req.body.user_ref) {
+      const collectionData = req.body.user_ref.split('/');
+      console.log("collectionName", collectionData)
+      req.body.user_ref = collectionData.length > 0
+        ? doc(db, collectionData[1], collectionData[2]) // assumes users collection
+        : null;
+    }
+
+    if (req.body.rodocref) {
+      const collectionData = req.body.rodocref.split('/');
+      req.body.rodocref = collectionData.length > 0
+        ? doc(db, collectionData[1], collectionData[2]) // adjust collection name
+        : null;
+    }
+    if (req.body.docrefinvoice) {
+      const collectionData = req.body.docrefinvoice.split('/');
+      req.body.docrefinvoice = collectionData.length > 0
+        ? doc(db, collectionData[1], collectionData[2]) // adjust collection name
+        : null;
+    }
+    if (req.body.Newspaper_allocation?.allotedby) {
+      const collectionData = req.body.Newspaper_allocation.allotedby.split('/');
+      req.body.Newspaper_allocation.allotedby = collectionData.length > 0
+        ? doc(db, collectionData[1], collectionData[2]) // adjust collection name
+        : null;
+    }
+
     let log = new ActionLog(req.body);
     log.networkip = req.body.networkip || req.clientIp;
     const docRef = await addDoc(actionLogsRef, { ...log });
@@ -216,14 +243,16 @@ export const getAllActionLogs = async (req, res) => {
       allocation_type,
       fromDate,
       toDate,
-      page = 0,  
+      email,
+      page = 0,
       limit = 10
     } = req.query;
 
     let constraints = [];
 
-    if (user_ref !== "all") constraints.push(where("user_ref", "==", user_ref));
+    if (user_ref !== "all") constraints.push(where("user_ref", "==", doc(db, "Users", user_ref)));
     if (islogin !== "all") constraints.push(where("islogin", "==", islogin === "true"));
+    if (email !== 'null') constraints.push(where("email", "==", email));
     if (rodocref !== "all") constraints.push(where("rodocref", "==", rodocref));
     if (user_role !== "all") constraints.push(where("user_role", "==", user_role));
     if (action !== "all") constraints.push(where("action", "==", Number(action)));
@@ -387,13 +416,13 @@ export const getActionLogById = async (req, res) => {
     const snapshot = await getDoc(logRef);
 
     if (!snapshot.exists()) {
-      return res.status(404).json({success: false, message: "ActionLog not found" });
+      return res.status(404).json({ success: false, message: "ActionLog not found" });
     }
 
-    res.status(200).json({success: true, id: snapshot.id, data:{...snapshot.data()} });
+    res.status(200).json({ success: true, id: snapshot.id, data: { ...snapshot.data() } });
   } catch (error) {
     console.error("Error in getActionLogById:", error);
-    res.status(500).json({success: false, error: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -402,9 +431,9 @@ export const deleteActionLog = async (req, res) => {
   try {
     const logRef = doc(db, "actionLogs", req.params.id);
     await deleteDoc(logRef);
-    res.status(200).json({success: true, message: "ActionLog deleted successfully" });
+    res.status(200).json({ success: true, message: "ActionLog deleted successfully" });
   } catch (error) {
     console.error("Error in deleteActionLog:", error);
-    res.status(500).json({success: false, message: "Internal server error", error: error.message });
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
   }
 };

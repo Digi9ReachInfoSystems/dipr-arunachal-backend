@@ -4,6 +4,7 @@ class ActionLog {
     user_ref = null,
     islogin = false,
     rodocref = null,
+    docrefinvoice = null,
     email = "",
     old_data = {},
     edited_data = {},
@@ -26,6 +27,7 @@ class ActionLog {
     this.user_ref = user_ref;
     this.islogin = islogin;
     this.rodocref = rodocref;
+    this.docrefinvoice = docrefinvoice;
     this.email = email;
     this.old_data = old_data;
     this.edited_data = edited_data;

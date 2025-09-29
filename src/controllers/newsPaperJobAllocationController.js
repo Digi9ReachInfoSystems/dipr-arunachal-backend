@@ -40,7 +40,7 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
 
             batch.update(docRef, {
                 aprovedcw: true,
-                timeofallotment: serverTimestamp(), //  currentTimeIST,
+                timeofallotment: serverTimestamp(), 
                 completed: false,
                 invoiceraised: false,
             });
@@ -128,7 +128,7 @@ export const updateApproveCvAndTimeAllotment = async (req, res) => {
                 body: JSON.stringify({
                     to: to,
                     advertisementNumber: advertisementNumber,
-                    // cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+                    cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
                     listOfNewspapers: newsPaperList
 
                 }),
