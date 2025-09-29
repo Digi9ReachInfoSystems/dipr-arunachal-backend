@@ -14,9 +14,9 @@ import {
   orderBy,
   limit as limitFn,
   startAfter,
-  documentId
+  documentId,
 } from "firebase/firestore";
-
+import admin from "firebase-admin";
 const actionLogsRef = collection(db, "actionLogs");
 import { AppError, handleError } from "../utils/errorHandler.js";
 
@@ -44,7 +44,6 @@ export const createActionLog = async (req, res) => {
     }
     if (req.body.user_ref) {
       const collectionData = req.body.user_ref.split('/');
-      console.log("collectionName", collectionData)
       req.body.user_ref = collectionData.length > 0
         ? doc(db, collectionData[1], collectionData[2]) // assumes users collection
         : null;
@@ -69,7 +68,16 @@ export const createActionLog = async (req, res) => {
         : null;
     }
 
+    if (req.body.actiontime && typeof req.body.actiontime === "string") {
+      req.body.actiontime = new Date(req.body.actiontime);
+    }
+
+    if (req.body.Newspaper_allocation?.allotedtime && typeof req.body.Newspaper_allocation?.allotedtime === "string") {
+      req.body.Newspaper_allocation.allotedtime = new Date(req.body.Newspaper_allocation.allotedtime);
+    }
+
     let log = new ActionLog(req.body);
+    console.log("Creating ActionLog:", log);
     log.networkip = req.body.networkip || req.clientIp;
     const docRef = await addDoc(actionLogsRef, { ...log });
     res.status(201).json({ success: true, message: "ActionLog created", id: docRef.id });
@@ -241,31 +249,47 @@ export const getAllActionLogs = async (req, res) => {
       platform,
       screen,
       allocation_type,
+      actionDate,
       fromDate,
       toDate,
       email,
-      page = 0,
+      page = 1,
       limit = 10
     } = req.query;
 
     let constraints = [];
 
-    if (user_ref !== "all") constraints.push(where("user_ref", "==", doc(db, "Users", user_ref)));
-    if (islogin !== "all") constraints.push(where("islogin", "==", islogin === "true"));
-    if (email !== 'all') constraints.push(where("email", "==", email));
-    if (rodocref !== "all") constraints.push(where("rodocref", "==", rodocref));
-    if (user_role !== "all") constraints.push(where("user_role", "==", user_role));
-    if (action !== "all") constraints.push(where("action", "==", Number(action)));
-    if (status !== "all") constraints.push(where("status", "==", status));
-    if (platform !== "all") constraints.push(where("platform", "==", platform));
-    if (screen !== "all") constraints.push(where("screen", "==", screen));
-    if (allocation_type !== "all")
-      constraints.push(where("newspaper_allocation.allocation_type", "==", allocation_type));
-    if (fromDate !== "all") constraints.push(where("actiontime", ">=", new Date(fromDate)));
-    if (toDate !== "all") constraints.push(where("actiontime", "<=", new Date(toDate)));
-  
-    constraints.push(orderBy("actiontime", "desc"));
+    if (user_ref !== "All") {
+      const userRef = doc(db, "Users", user_ref); // user_ref should be the doc id (e.g. "abc123")
+      constraints.push(where("user_ref", "==", userRef));
+    }
 
+    if (islogin !== "All") constraints.push(where("islogin", "==", islogin === "true"));
+    if (email !== 'All') constraints.push(where("email", "==", email));
+    if (rodocref !== "All") {
+      const rodocrefRef = doc(db, "Advertisement", rodocref); // rodocref should be the doc id (e.g. "abc123")
+      constraints.push(where("rodocref", "==", rodocrefRef));
+    }
+    if (user_role !== "All") constraints.push(where("user_role", "==", user_role));
+    if (action !== "All") constraints.push(where("action", "==", Number(action)));
+    if (status !== "All") constraints.push(where("status", "==", status));
+    if (platform !== "All") constraints.push(where("platform", "==", platform));
+    if (screen !== "All") constraints.push(where("screen", "==", screen));
+    if (allocation_type !== "All")
+      constraints.push(where("Newspaper_allocation.allocation_type", "==", allocation_type));
+    // if (fromDate !== "all") constraints.push(where("actiontime", ">=", new Date(fromDate)));
+    // if (toDate !== "all") constraints.push(where("actiontime", "<=", new Date(toDate)));
+    if (actionDate && actionDate !== "All") {
+      const startDate = new Date(`${actionDate}T00:00:00Z`);
+      const endDate = new Date(`${actionDate}T23:59:59.999Z`);
+
+      const startTimestamp = Timestamp.fromDate(startDate);
+      const endTimestamp = Timestamp.fromDate(endDate);
+      constraints.push(where("actiontime", ">=", startTimestamp));
+      constraints.push(where("actiontime", "<=", endTimestamp));
+    }
+
+    constraints.push(orderBy("actiontime", "desc"));
     // 🔹 Fetch all docs (be careful: can be costly if collection is very large)
     const allSnap = await getDocs(query(actionLogsRef, ...constraints));
     const allDocs = allSnap.docs;
@@ -273,7 +297,7 @@ export const getAllActionLogs = async (req, res) => {
     const totalDocs = allDocs.length;
     const totalPages = Math.ceil(totalDocs / Number(limit));
 
-    const startIndex = Number(page) * Number(limit);
+    const startIndex = Number(page - 1) * Number(limit);
     const endIndex = startIndex + Number(limit);
 
     const pageDocs = allDocs.slice(startIndex, endIndex);
@@ -287,12 +311,12 @@ export const getAllActionLogs = async (req, res) => {
       success: true,
       message: "ActionLogs fetched successfully",
       pagination: {
-        currentPage: Number(page),                       
+        currentPage: Number(page),
         totalPages,
         hasNextPage: Number(page) < totalPages - 1,
-        hasPreviousPage: Number(page) > 0,
+        hasPreviousPage: Number(page) > 1,
         nextPage: Number(page) < totalPages - 1 ? Number(page) + 1 : null,
-        prevPage: Number(page) > 0 ? Number(page) - 1 : null,
+        prevPage: Number(page) > 1 ? Number(page) - 1 : null,
       },
       count: logs.length,
       data: logs,

@@ -4,6 +4,7 @@ class ActionLog {
     user_ref = null,
     islogin = false,
     rodocref = null,
+    ronumber = null,
     docrefinvoice = null,
     email = "",
     old_data = {},
@@ -27,6 +28,7 @@ class ActionLog {
     this.user_ref = user_ref;
     this.islogin = islogin;
     this.rodocref = rodocref;
+    this.ronumber = ronumber;
     this.docrefinvoice = docrefinvoice;
     this.email = email;
     this.old_data = old_data;
@@ -63,7 +65,6 @@ const AllocationType = Object.freeze({
   AUTOMATIC: "Automatic",
 });
 
-// Enum for platform
 const PlatformType = Object.freeze({
   IOS: "iOS", 
   ANDROID: "Android",
