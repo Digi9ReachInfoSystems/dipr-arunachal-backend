@@ -263,7 +263,7 @@ export const getAllActionLogs = async (req, res) => {
       constraints.push(where("newspaper_allocation.allocation_type", "==", allocation_type));
     if (fromDate !== "all") constraints.push(where("actiontime", ">=", new Date(fromDate)));
     if (toDate !== "all") constraints.push(where("actiontime", "<=", new Date(toDate)));
-
+  
     constraints.push(orderBy("actiontime", "desc"));
 
     // 🔹 Fetch all docs (be careful: can be costly if collection is very large)
@@ -287,7 +287,7 @@ export const getAllActionLogs = async (req, res) => {
       success: true,
       message: "ActionLogs fetched successfully",
       pagination: {
-        currentPage: Number(page),                       // starts at 0
+        currentPage: Number(page),                       
         totalPages,
         hasNextPage: Number(page) < totalPages - 1,
         hasPreviousPage: Number(page) > 0,
