@@ -252,7 +252,7 @@ export const getAllActionLogs = async (req, res) => {
 
     if (user_ref !== "all") constraints.push(where("user_ref", "==", doc(db, "Users", user_ref)));
     if (islogin !== "all") constraints.push(where("islogin", "==", islogin === "true"));
-    if (email !== 'null') constraints.push(where("email", "==", email));
+    if (email !== 'all') constraints.push(where("email", "==", email));
     if (rodocref !== "all") constraints.push(where("rodocref", "==", rodocref));
     if (user_role !== "all") constraints.push(where("user_role", "==", user_role));
     if (action !== "all") constraints.push(where("action", "==", Number(action)));
