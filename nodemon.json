@@ -1,5 +1,5 @@
 {
-  "watch": [
+  "watch":  [
     "index.js",
     "src/controllers",
     "src/routes",
@@ -7,7 +7,7 @@
     "src/configs", 
     "src/utils"
   ],
-  "ext": "js,json",
-  "ignore": ["node_modules"],
-  "exec": "node index.js"
+  "ext": "ts,json",
+  "ignore": ["dist", "node_modules"],
+  "exec": "node --loader ts-node/esm index.ts"
 }
