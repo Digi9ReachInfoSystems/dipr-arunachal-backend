@@ -41,13 +41,33 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 // Routes
 import actionLogRoute from "./src/routes/actionLogRoute.js";
 import newsPaperJobAllocationRoute from "./src/routes/newsPaperJobAllocationRoutes.js";
+import dashboardRoute from "./src/routes/dashboardRoutes.js";
+
+
+
+
+
+
+
 
 app.use("/actionLogs", actionLogRoute);
 app.use("/newsPaperJobAllocation", newsPaperJobAllocationRoute);
+app.use("/dashboard", dashboardRoute);
+
+
+
+
 
 // Root endpoint
 app.get("/", (_req: Request, res: Response) => {
-  res.send("Server is running healthy in migration branch ");
+  if (process.env.NODE_ENV == 'production') {
+    res.send("Server is running healthy  in production mode");
+    return;
+  } else if (process.env.NODE_ENV == 'development') {
+    res.send("Server is running healthy  in development mode");
+  } else {
+    res.send("Server is running healthy ");
+  } 
 });
 
 // Start the Server
