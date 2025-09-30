@@ -47,7 +47,7 @@ app.use("/newsPaperJobAllocation", newsPaperJobAllocationRoute);
 
 // Root endpoint
 app.get("/", (_req: Request, res: Response) => {
-  res.send("Server is running healthy in development mode");
+  res.send("Server is running healthy in migration branch ");
 });
 
 // Start the Server
