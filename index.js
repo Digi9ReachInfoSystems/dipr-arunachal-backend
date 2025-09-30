@@ -47,7 +47,8 @@ app.use("/newsPaperJobAllocation", newsPaperJobAllocationRoute);
 
 
 app.get("/", (req, res) => {
-    res.send("Server is running healthy");
+  req.headers['']
+    res.send("Server is running healthy in development mode");
 });
 
 
