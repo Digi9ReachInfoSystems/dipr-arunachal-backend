@@ -15,7 +15,7 @@ export interface NewspaperAllocation {
   Newspaper: string[];
   allotedtime: Date | null;
   allocation_type: AllocationType | null;
-  allotedby: DocumentReference | null;  
+  allotedby: DocumentReference | null;
 }
 
 export interface ActionLogProps {
@@ -36,6 +36,8 @@ export interface ActionLogProps {
   networkip?: string | null;
   screen?: string;
   Newspaper_allocation?: Partial<NewspaperAllocation>;
+  newspaper_job_allocation?: DocumentReference | null;
+  note_sheet_allocation?: DocumentReference | null;
 }
 
 export default class ActionLog {
@@ -56,7 +58,8 @@ export default class ActionLog {
   networkip: string | null;
   screen: string;
   Newspaper_allocation: NewspaperAllocation;
-
+  newspaper_job_allocation: DocumentReference | null;
+  note_sheet_allocation: DocumentReference | null;
   constructor({
     user_ref = null,
     islogin = false,
@@ -80,6 +83,8 @@ export default class ActionLog {
       allocation_type: null,
       allotedby: null,
     },
+    newspaper_job_allocation = null,
+    note_sheet_allocation = null,
   }: ActionLogProps) {
     this.user_ref = user_ref;
     this.islogin = islogin;
@@ -87,8 +92,8 @@ export default class ActionLog {
     this.ronumber = ronumber;
     this.docrefinvoice = docrefinvoice;
     this.email = email;
-    this.old_data = old_data|| {};
-    this.edited_data = edited_data|| {};
+    this.old_data = old_data || {};
+    this.edited_data = edited_data || {};
     this.user_role = user_role;
     this.action = action;
     this.message = message;
@@ -108,12 +113,15 @@ export default class ActionLog {
       allotedtime: Newspaper_allocation?.allotedtime || null,
       allocation_type:
         Newspaper_allocation?.allocation_type === null ||
-        Object.values(AllocationType).includes(
-          Newspaper_allocation?.allocation_type as AllocationType
-        )
+          Object.values(AllocationType).includes(
+            Newspaper_allocation?.allocation_type as AllocationType
+          )
           ? (Newspaper_allocation?.allocation_type as AllocationType) || null
           : null,
       allotedby: Newspaper_allocation?.allotedby || null,
     };
+    this.newspaper_job_allocation = newspaper_job_allocation;
+    this.note_sheet_allocation = note_sheet_allocation;
   }
+
 }
