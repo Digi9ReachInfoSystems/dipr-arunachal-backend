@@ -47,6 +47,16 @@ export const createActionLog = async (req, res) => {
             typeof body.Newspaper_allocation.allotedtime === "string") {
             body.Newspaper_allocation.allotedtime = new Date(body.Newspaper_allocation.allotedtime);
         }
+        if (body.newspaper_job_allocation) {
+            const collectionData = body.newspaper_job_allocation.split("/");
+            body.newspaper_job_allocation =
+                collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
+        }
+        if (body.note_sheet_allocation) {
+            const collectionData = body.note_sheet_allocation.split("/");
+            body.note_sheet_allocation =
+                collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
+        }
         const log = new ActionLog(body);
         log.networkip = req.ip || null;
         const docRef = await addDoc(actionLogsRef, { ...log });
