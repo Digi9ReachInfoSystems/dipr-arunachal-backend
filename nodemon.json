@@ -1,6 +1,6 @@
 {
   "watch":  [
-    "index.js",
+    "index.ts",
     "src/controllers",
     "src/routes",
     "src/models",
