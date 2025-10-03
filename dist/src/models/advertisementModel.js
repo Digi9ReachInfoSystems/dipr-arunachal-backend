@@ -1,0 +1,64 @@
+import { DocumentReference } from "firebase/firestore";
+export default class Advertisement {
+    AdvertisementId;
+    DateOfApplication;
+    Subject;
+    AddressTo;
+    TypeOfAdvertisement;
+    Is_CaseWorker;
+    Is_Deputy;
+    Is_fao;
+    Is_Vendor;
+    Status_Caseworker;
+    Status_Deputy;
+    Status_Fao;
+    Status_Vendor;
+    Bearingno;
+    Insertion;
+    Department_name;
+    type_face_size;
+    isDarft;
+    ListofPdf;
+    isnational;
+    isbothnationalandlocal;
+    approvednewspaperslocal;
+    RegionalNewspaper;
+    localnewspapers;
+    DateOfApproval;
+    RODATE;
+    Bill_to;
+    Edition;
+    publicationdateList;
+    constructor({ AdvertisementId = "", DateOfApplication = null, Subject = "", AddressTo = "", TypeOfAdvertisement = "", Is_CaseWorker = false, Is_Deputy = false, Is_fao = false, Is_Vendor = false, Status_Caseworker = 0, Status_Deputy = 0, Status_Fao = 0, Status_Vendor = 0, Bearingno = "", Insertion = "", Department_name = "", type_face_size = "", isDarft = false, ListofPdf = [], isnational = false, isbothnationalandlocal = false, approvednewspaperslocal = [], RegionalNewspaper = false, localnewspapers = false, DateOfApproval = null, RODATE = null, Bill_to = "", Edition = "", publicationdateList = [], }) {
+        this.AdvertisementId = AdvertisementId;
+        this.DateOfApplication = DateOfApplication;
+        this.Subject = Subject;
+        this.AddressTo = AddressTo;
+        this.TypeOfAdvertisement = TypeOfAdvertisement;
+        this.Is_CaseWorker = Is_CaseWorker;
+        this.Is_Deputy = Is_Deputy;
+        this.Is_fao = Is_fao;
+        this.Is_Vendor = Is_Vendor;
+        this.Status_Caseworker = Status_Caseworker;
+        this.Status_Deputy = Status_Deputy;
+        this.Status_Fao = Status_Fao;
+        this.Status_Vendor = Status_Vendor;
+        this.Bearingno = Bearingno;
+        this.Insertion = Insertion;
+        this.Department_name = Department_name;
+        this.type_face_size = type_face_size;
+        this.isDarft = isDarft;
+        this.ListofPdf = ListofPdf;
+        this.isnational = isnational;
+        this.isbothnationalandlocal = isbothnationalandlocal;
+        this.approvednewspaperslocal = approvednewspaperslocal;
+        this.RegionalNewspaper = RegionalNewspaper;
+        this.localnewspapers = localnewspapers;
+        this.DateOfApproval = DateOfApproval;
+        this.RODATE = RODATE;
+        this.Bill_to = Bill_to;
+        this.Edition = Edition;
+        this.publicationdateList = publicationdateList;
+    }
+}
+//# sourceMappingURL=advertisementModel.js.map
