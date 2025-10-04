@@ -1,5 +1,6 @@
 import express from "express";
 import {
+    automaticAllocationSendToNewspaper,
     createAdvertisement,
     editAdvertisement,
     getAdvertisementById,
@@ -12,4 +13,5 @@ router.post("/createReleaseOrder", createAdvertisement);
 router.get("/getAdvertisements/byId/:id",getAdvertisementById);
 router.post("/saveDraftAdvertisement", saveDraftAdvertisement);
 router.put("/updateDraftAdvertisement/:id", editAdvertisement);
+router.post("/automaticAllocation/sendToNewspaper/:id", automaticAllocationSendToNewspaper);
 export default router;

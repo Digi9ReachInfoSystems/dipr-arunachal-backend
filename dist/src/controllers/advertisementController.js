@@ -1,4 +1,4 @@
-import { getFirestore, doc, getDoc, writeBatch, serverTimestamp, getDocs, collection, DocumentReference, addDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, writeBatch, serverTimestamp, getDocs, collection, DocumentReference, addDoc, updateDoc, increment, } from "firebase/firestore";
 import moment from "moment-timezone";
 import db from "../configs/firebase.js";
 import Advertisement, {} from "../models/advertisementModel.js";
@@ -213,6 +213,144 @@ export const editAdvertisement = async (req, res) => {
     catch (error) {
         console.error("Error in editAdvertisement:", error);
         res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+};
+export const automaticAllocationSendToNewspaper = async (req, res) => {
+    try {
+        const { allotednewspapers = [], Status_Deputy, Status_Vendor, Status_Caseworker, approved, Is_CaseWorker, DateOfApproval, isDarft, approvedstatus, numOfVendors, acknowledgedboolean, completed, aprovedcw, invoiceraised, duetime, } = req.body;
+        const advertisementId = req.params.id;
+        if (!advertisementId) {
+            return res.status(400).json({ message: "Missing advertisement ID" });
+        }
+        // 🔹 Step 1 — Update Advertisement document
+        const adRef = doc(db, "Advertisement", advertisementId);
+        const adSnap = await getDoc(adRef);
+        if (!adSnap.exists()) {
+            return res.status(404).json({ message: "Advertisement not found" });
+        }
+        await updateDoc(adRef, {
+            allotednewspapers,
+            Status_Deputy: Number(Status_Deputy) || 0,
+            Status_Vendor: Number(Status_Vendor) || 0,
+            Status_Caseworker: Number(Status_Caseworker) || 0,
+            approved: !!approved,
+            Is_CaseWorker: !!Is_CaseWorker,
+            DateOfApproval: DateOfApproval ? new Date(DateOfApproval) : new Date(),
+            isDarft: !!isDarft,
+            approvedstatus: !!approvedstatus,
+            updatedAt: serverTimestamp(),
+        });
+        console.log("✅ Advertisement updated successfully");
+        // 🔹 Step 2 — Fetch first joblogic document
+        const joblogicSnapshot = await getDocs(collection(db, "joblogic"));
+        const joblogicDoc = joblogicSnapshot.docs[0];
+        if (!joblogicDoc) {
+            return res.status(404).json({ message: "Joblogic document not found" });
+        }
+        const joblogicRef = doc(db, "joblogic", joblogicDoc.id);
+        const ronumbers = joblogicDoc.data().ronumbers || 0;
+        // 🔹 Step 3 — Create NewspaperJobAllocation documents
+        const num = parseInt(numOfVendors) || allotednewspapers.length;
+        if (num === 0) {
+            return res.status(400).json({ message: "No vendors provided" });
+        }
+        let joballocationData = [];
+        let vendorMailList = [];
+        const newsPaperList = [];
+        for (let i = 0; i < num; i++) {
+            const vendorRef = allotednewspapers[i];
+            if (!vendorRef)
+                continue;
+            const collectionData = vendorRef.split("/");
+            let vendorDocRef = null;
+            if (collectionData.length <= 0)
+                continue;
+            vendorDocRef = doc(db, collectionData[1], collectionData[2]);
+            const allocationPayload = {
+                timeofallotment: serverTimestamp(),
+                acknowledgedboolean: acknowledgedboolean || false,
+                newspaperrefuserref: vendorDocRef || null,
+                adref: adRef,
+                completed: completed || false,
+                aprovedcw: aprovedcw || false,
+                invoiceraised: invoiceraised || false,
+                duetime: new Date(duetime),
+                ronumber: `DIPR/ARN/${ronumbers + i + 1}`,
+                createdAt: serverTimestamp(),
+            };
+            const allocationDocRef = await addDoc(collection(db, "NewspaperJobAllocation"), allocationPayload);
+            joballocationData.push({ id: allocationDocRef.id, ...allocationPayload });
+            console.log(`📰 Created allocation for vendor ${i + 1}`);
+            const userSnap = await getDoc(vendorDocRef);
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                if (userData) {
+                    vendorMailList.push({
+                        to: userData.email || "",
+                        roNumber: `DIPR/ARN/${ronumbers + i + 1}`,
+                        addressTo: "Technical Assistant",
+                    });
+                    if (userData.display_name) {
+                        newsPaperList.push(userData.display_name);
+                    }
+                }
+            }
+        }
+        // 🔹 Step 4 — Increment ronumber counter atomically
+        await updateDoc(joblogicRef, {
+            ronumbers: increment(num),
+            updatedAt: serverTimestamp(),
+        });
+        console.log("🔁 Joblogic ronumbers incremented successfully");
+        //mail logic to vendors
+        for (const mail of vendorMailList) {
+            try {
+                await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(mail),
+                });
+                console.log(`Email sent to ${mail.to}`);
+            }
+            catch (err) {
+                console.error(`Failed to send email to ${mail.to}:`, err.message);
+            }
+        }
+        // Send mail to department
+        const advertisementNumber = adSnap.data().AdvertisementId || "";
+        const to = adSnap.data().Bearingno || "";
+        try {
+            await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to,
+                    advertisementNumber,
+                    cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+                    listOfNewspapers: newsPaperList,
+                }),
+            });
+            console.log(`Email sent to department`, to);
+        }
+        catch (err) {
+            console.error(`Failed to send email to ${to}:`, err.message);
+        }
+        // ✅ Success response
+        return res.status(200).json({
+            success: true,
+            message: "Automatic allocation completed successfully.",
+            updatedAdvertisement: advertisementId,
+            allocationsCreated: num,
+            joballocationData,
+        });
+    }
+    catch (error) {
+        console.error("❌ Error in automaticAllocationSendToNewspaper:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal Server Error",
+            error: error instanceof Error ? error.message : error,
+        });
     }
 };
 //# sourceMappingURL=advertisementController.js.map
