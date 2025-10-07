@@ -14,6 +14,7 @@ import {
 import type { Request, Response } from "express";
 import db from "../configs/firebase.js";
 import { AppError, handleError } from "../utils/errorHandler.js";
+import axios from "axios";
 
 export const getDashboardStats = async (req: Request, res: Response) => {
     try {
@@ -41,6 +42,21 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         res.status(200).json({ totalUsers, totalVendors, totalRo, remainingBudget, totalNoteSheets });
     } catch (error: Error | any) {
         console.error("Error in getDashboardStats:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+export const getDetailsByIp = async (req: Request, res: Response) => {
+    try {
+        const { ip } = req.params;
+        if (!ip) {
+            return res.status(400).json({ message: "IP address is required" });
+        }
+        const response = await axios.get(`https://freegeoip.app/json/${ip}`);
+        res.status(200).json(response.data);
+
+    } catch (error: Error | any) {
+        console.error("Error in getDetailsByIp:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
