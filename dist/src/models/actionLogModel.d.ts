@@ -32,7 +32,7 @@ export interface ActionLogProps {
     networkip?: string | null;
     screen?: string;
     Newspaper_allocation?: Partial<NewspaperAllocation>;
-    newspaper_job_allocation?: DocumentReference | null;
+    adRef?: DocumentReference | null;
     note_sheet_allocation?: DocumentReference | null;
 }
 export default class ActionLog {
@@ -53,8 +53,8 @@ export default class ActionLog {
     networkip: string | null;
     screen: string;
     Newspaper_allocation: NewspaperAllocation;
-    newspaper_job_allocation: DocumentReference | null;
+    adRef: DocumentReference | null;
     note_sheet_allocation: DocumentReference | null;
-    constructor({ user_ref, islogin, rodocref, ronumber, docrefinvoice, email, old_data, edited_data, user_role, action, message, status, actiontime, platform, networkip, screen, Newspaper_allocation, newspaper_job_allocation, note_sheet_allocation, }: ActionLogProps);
+    constructor({ user_ref, islogin, rodocref, ronumber, docrefinvoice, email, old_data, edited_data, user_role, action, message, status, actiontime, platform, networkip, screen, Newspaper_allocation, adRef, note_sheet_allocation, }: ActionLogProps);
 }
 //# sourceMappingURL=actionLogModel.d.ts.map

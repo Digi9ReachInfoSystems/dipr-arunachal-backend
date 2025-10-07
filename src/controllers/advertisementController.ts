@@ -12,11 +12,12 @@ import {
   addDoc,
   updateDoc,
   increment,
+  runTransaction,
 } from "firebase/firestore";
 import moment from "moment-timezone";
 import db from "../configs/firebase.js";
 import Advertisement, { type AdvertisementProps } from "../models/advertisementModel.js";
-
+import ActionLog, { AllocationType, PlatformType } from "../models/actionLogModel.js";
 
 export const createAdvertisement = async (req: Request, res: Response) => {
   try {
@@ -116,112 +117,98 @@ export const getAdvertisementById = async (req: Request, res: Response) => {
   }
 }
 
-export const saveDraftAdvertisement = async (req: Request, res: Response) => {
-  try {
-    if (req.body.approvednewspaperslocal && req.body.approvednewspaperslocal.length > 0) {
-      req.body.approvednewspaperslocal = req.body.approvednewspaperslocal
-        .map((ref: string) => {
-          if (ref && typeof ref === "string") {
-            const collectionData = ref.split("/");
-            if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
-              return doc(db, collectionData[1], collectionData[2]);
-            }
-          }
-          return null;
-        })
-        .filter((r: any) => r !== null);
-    }
 
-    if (req.body.DateOfApplication) {
-      req.body.DateOfApplication = new Date(req.body.DateOfApplication);
-    }
-    if (req.body.RODATE) {
-      req.body.RODATE = new Date(req.body.RODATE);
-    }
-    if (req.body.publicationdateList && req.body.publicationdateList.length > 0) {
-      req.body.publicationdateList = req.body.publicationdateList.map(
-        (dateStr: string) => new Date(dateStr)
-      );
-    }
-
-    let body = req.body;
-    const ad = new Advertisement(body);
-
-    const payload = {
-      AdvertisementId: ad.AdvertisementId,
-      DateOfApplication: ad.DateOfApplication || serverTimestamp(),
-      Subject: ad.Subject,
-      AddressTo: ad.AddressTo,
-      TypeOfAdvertisement: ad.TypeOfAdvertisement,
-      Is_CaseWorker: ad.Is_CaseWorker || false,
-      Is_Deputy: ad.Is_Deputy || false,
-      Is_fao: ad.Is_fao || false,
-      Is_Vendor: ad.Is_Vendor || false,
-      Status_Caseworker: ad.Status_Caseworker || 0,
-      Status_Deputy: ad.Status_Deputy || 0,
-      Status_Fao: ad.Status_Fao || 0,
-      Status_Vendor: ad.Status_Vendor || 0,
-      Bearingno: ad.Bearingno,
-      Insertion: ad.Insertion,
-      Department_name: ad.Department_name,
-      type_face_size: ad.type_face_size,
-      isDarft: true,
-      ListofPdf: ad.ListofPdf || [],
-      isnational: ad.isnational || false,
-      isbothnationalandlocal: ad.isbothnationalandlocal || false,
-      approvednewspaperslocal: ad.approvednewspaperslocal || [],
-      RegionalNewspaper: ad.RegionalNewspaper || false,
-      localnewspapers: ad.localnewspapers || false,
-      RODATE: ad.RODATE || null,
-      Bill_to: ad.Bill_to,
-      Edition: ad.Edition,
-      publicationdateList: ad.publicationdateList || [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-
-    const docRef = await addDoc(collection(db, "Advertisement"), payload);
-
-    return res.status(201).json({
-      success: true,
-      id: docRef.id,
-      data: payload,
-    });
-  } catch (error) {
-    console.error("Error in saveDraftAdvertisement:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-};
 
 export const editAdvertisement = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
     if (!id) {
-      return res.status(400).json({ success: false, message: "Document ID is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Document ID is required",
+      });
     }
 
     const updatePayload: any = {};
 
-    if (req.body.AdvertisementId) updatePayload.AdvertisementId = req.body.AdvertisementId;
+    // 🔹 Convert approvednewspaperslocal to DocumentReferences if passed
+    if (req.body.approvednewspaperslocal && req.body.approvednewspaperslocal.length > 0) {
+      updatePayload.approvednewspaperslocal = req.body.approvednewspaperslocal.map((ref: string) => {
+        if (ref && typeof ref === "string") {
+          const collectionData = ref.split("/");
+          if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+            return doc(db, collectionData[1], collectionData[2]);
+          }
+        }
+        return null;
+      }).filter(Boolean);
+    }
+
+    // 🔹 Date conversions
     if (req.body.DateOfApplication)
       updatePayload.DateOfApplication = new Date(req.body.DateOfApplication);
-    if (req.body.Subject) updatePayload.Subject = req.body.Subject;
-    if (req.body.AddressTo) updatePayload.AddressTo = req.body.AddressTo;
-    if (req.body.TypeOfAdvertisement) updatePayload.TypeOfAdvertisement = req.body.TypeOfAdvertisement;
-    if (req.body.Bearingno) updatePayload.Bearingno = req.body.Bearingno;
-    if (req.body.Department_name) updatePayload.Department_name = req.body.Department_name;
-    if (typeof req.body.isnational === "boolean") updatePayload.isnational = req.body.isnational;
-    if (typeof req.body.isbothnationalandlocal === "boolean")
-      updatePayload.isbothnationalandlocal = req.body.isbothnationalandlocal;
-    if (typeof req.body.RegionalNewspaper === "boolean")
-      updatePayload.RegionalNewspaper = req.body.RegionalNewspaper;
-    if (typeof req.body.localnewspapers === "boolean")
-      updatePayload.localnewspapers = req.body.localnewspapers;
-    if (req.body.Bill_to) updatePayload.Bill_to = req.body.Bill_to;
-    if (req.body.Edition) updatePayload.Edition = req.body.Edition;
+    if (req.body.DateOfApproval)
+      updatePayload.DateOfApproval = new Date(req.body.DateOfApproval);
+    if (req.body.RODATE)
+      updatePayload.RODATE = new Date(req.body.RODATE);
 
+    if (req.body.publicationdateList && req.body.publicationdateList.length > 0)
+      updatePayload.publicationdateList = req.body.publicationdateList.map(
+        (d: string) => new Date(d)
+      );
+
+    // 🔹 Direct mappings
+    const directFields = [
+      "AdvertisementId",
+      "Subject",
+      "AddressTo",
+      "TypeOfAdvertisement",
+      "Bearingno",
+      "Insertion",
+      "Department_name",
+      "type_face_size",
+      "Bill_to",
+      "Edition",
+      "ListofPdf",
+    ];
+    directFields.forEach((field) => {
+      if (req.body[field] !== undefined) updatePayload[field] = req.body[field];
+    });
+
+    // 🔹 Boolean flags
+    const booleanFields = [
+      "Is_CaseWorker",
+      "Is_Deputy",
+      "Is_fao",
+      "Is_Vendor",
+      "isDarft",
+      "isnational",
+      "isbothnationalandlocal",
+      "RegionalNewspaper",
+      "localnewspapers",
+    ];
+    booleanFields.forEach((field) => {
+      if (req.body[field] !== undefined)
+        updatePayload[field] = Boolean(req.body[field]);
+    });
+
+    // 🔹 Integer fields
+    const integerFields = [
+      "Status_Caseworker",
+      "Status_Deputy",
+      "Status_Fao",
+      "Status_Vendor",
+    ];
+    integerFields.forEach((field) => {
+      if (req.body[field] !== undefined)
+        updatePayload[field] = Number(req.body[field]);
+    });
+
+    // 🔹 Update timestamps
     updatePayload.updatedAt = serverTimestamp();
 
+    // 🔹 Perform Firestore update
     const docRef = doc(collection(db, "Advertisement"), id);
     await updateDoc(docRef, updatePayload);
 
@@ -232,40 +219,53 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       data: updatePayload,
     });
   } catch (error) {
-    console.error("Error in editAdvertisement:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error" });
+    console.error("❌ Error in editAdvertisement:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error instanceof Error ? error.message : error,
+    });
   }
 };
-export const automaticAllocationSendToNewspaper = async (
+export const automaticAllocationSendToNewspaperog = async (
   req: Request,
   res: Response
 ) => {
   try {
     const {
-      allotednewspapers = [],
-      Status_Deputy,
-      Status_Vendor,
-      Status_Caseworker,
-      approved,
-      Is_CaseWorker,
-      DateOfApproval,
-      isDarft,
-      approvedstatus,
+      advertisementId,
       numOfVendors,
-      acknowledgedboolean,
-      completed,
-      aprovedcw,
-      invoiceraised,
-      duetime,
     } = req.body;
+    let logStatus = "success";
+    let logMessage = "Automatic allocation completed successfully.";
+    let oldData: any = {};
+    let editedData: any = {};
 
-    const advertisementId = req.params.id;
-
-    if (!advertisementId) {
-      return res.status(400).json({ message: "Missing advertisement ID" });
+    if (!advertisementId || !numOfVendors) {
+      throw new Error("Missing required parameters: advertisementId or numOfVendors");
     }
 
-    // 🔹 Step 1 — Update Advertisement document
+    // step-1 Prepare allotednewspapers array and roNumber
+    const allotednewspapers: string[] = [];
+    const jobLogiDataSnapshot = await getDocs(collection(db, "joblogic"));
+    if (jobLogiDataSnapshot.empty) {
+      return res.status(404).json({ message: "Job logic data document does not exist" });
+    }
+    const docSnap = jobLogiDataSnapshot.docs[0];
+    if (!docSnap) {
+      return res.status(404).json({ message: "Job logic data document does not exist" });
+    }
+    const jobLogicData = docSnap.data();
+    const ronumbers = jobLogicData.ronumbers || 0;
+
+    const newspapers = jobLogicData.waitingquuelist || [];
+    for (let i = 0; i < Number(numOfVendors); i++) {
+      const newspaper = newspapers[i % newspapers.length];
+      allotednewspapers.push(newspaper);
+    }
+
+
+    // 🔹 Step 2 — Update Advertisement document
     const adRef = doc(db, "Advertisement", advertisementId);
     const adSnap = await getDoc(adRef);
     if (!adSnap.exists()) {
@@ -275,31 +275,30 @@ export const automaticAllocationSendToNewspaper = async (
 
     await updateDoc(adRef, {
       allotednewspapers,
-      Status_Deputy: Number(Status_Deputy) || 0,
-      Status_Vendor: Number(Status_Vendor) || 0,
-      Status_Caseworker: Number(Status_Caseworker) || 0,
-      approved: !!approved,
-      Is_CaseWorker: !!Is_CaseWorker,
-      DateOfApproval: DateOfApproval ? new Date(DateOfApproval) : new Date(),
-      isDarft: !!isDarft,
-      approvedstatus: !!approvedstatus,
+      Status_Deputy: 2,
+      Status_Vendor: 1,
+      Status_Caseworker: 5,
+      approved: true,
+      Is_CaseWorker: true,
+      DateOfApproval: serverTimestamp(),
+      isDarft: false,
+      approvedstatus: 0,
       updatedAt: serverTimestamp(),
+      Release_order_no: `DIPR/ARN/${ronumbers}`,
     });
 
     console.log("✅ Advertisement updated successfully");
 
-    // 🔹 Step 2 — Fetch first joblogic document
+    // 🔹 Step 3 — Fetch first joblogic document
     const joblogicSnapshot = await getDocs(collection(db, "joblogic"));
     const joblogicDoc = joblogicSnapshot.docs[0];
 
     if (!joblogicDoc) {
       return res.status(404).json({ message: "Joblogic document not found" });
     }
-
     const joblogicRef = doc(db, "joblogic", joblogicDoc.id);
-    const ronumbers = joblogicDoc.data().ronumbers || 0;
 
-    // 🔹 Step 3 — Create NewspaperJobAllocation documents
+    // 🔹 Step 4 — Create NewspaperJobAllocation documents
     const num = parseInt(numOfVendors) || allotednewspapers.length;
     if (num === 0) {
       return res.status(400).json({ message: "No vendors provided" });
@@ -307,25 +306,49 @@ export const automaticAllocationSendToNewspaper = async (
     let joballocationData = [];
     let vendorMailList = [];
     const newsPaperList: string[] = [];
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const now = new Date();
+    const nowIST = new Date(now.getTime() + istOffsetMs);
+    const dueIST = new Date(
+      nowIST.getFullYear(),
+      nowIST.getMonth(),
+      nowIST.getDate(),
+      19, 0, 0, 0
+    );
+    const dueUTC = new Date(dueIST.getTime());
+
 
     for (let i = 0; i < num; i++) {
       const vendorRef = allotednewspapers[i];
+      console.log("value", vendorRef);
       if (!vendorRef) continue;
-      const collectionData = vendorRef.split("/");
+      // ✅ Case 1: vendorRef is already a DocumentReference
       let vendorDocRef: DocumentReference<DocumentData> | null = null;
-      if (collectionData.length <= 0) continue;
-      vendorDocRef = doc(db, collectionData[1], collectionData[2]);
+      if (vendorRef && typeof vendorRef === "object" && "id" in vendorRef) {
+        vendorDocRef = vendorRef as DocumentReference<DocumentData>;
+      }
+      // ✅ Case 2: vendorRef is a string path like "Users/abc123"
+      else if (typeof vendorRef === "string") {
+        const collectionData = vendorRef.split("/");
+        if (collectionData.length >= 2 && collectionData[0] && collectionData[1]) {
+          vendorDocRef = doc(db, collectionData[0], collectionData[1]);
+        }
+      }
+      if (!vendorDocRef) {
+        console.warn(`⚠️ Invalid vendor reference format: ${vendorRef}`);
+        continue;
+      }
 
 
       const allocationPayload = {
         timeofallotment: serverTimestamp(),
-        acknowledgedboolean: acknowledgedboolean || false,
+        acknowledgedboolean: false,
         newspaperrefuserref: vendorDocRef || null,
         adref: adRef,
-        completed: completed || false,
-        aprovedcw: aprovedcw || false,
-        invoiceraised: invoiceraised || false,
-        duetime: new Date(duetime),
+        completed: false,
+        aprovedcw: true,
+        invoiceraised: false,
+        duetime: dueUTC,
         ronumber: `DIPR/ARN/${ronumbers + i + 1}`,
         createdAt: serverTimestamp(),
       };
@@ -339,7 +362,7 @@ export const automaticAllocationSendToNewspaper = async (
         if (userData) {
           vendorMailList.push({
             to: userData.email || "",
-            roNumber: `DIPR/ARN/${ronumbers + i + 1}`,
+            roNumber: `DIPR/ARN/${ronumbers + i}`,
             addressTo: "Technical Assistant",
           });
           if (userData.display_name) {
@@ -349,10 +372,16 @@ export const automaticAllocationSendToNewspaper = async (
       }
     }
 
-    // 🔹 Step 4 — Increment ronumber counter atomically
+    // 🔹 Step 5 — Increment ronumber counter atomically
     await updateDoc(joblogicRef, {
       ronumbers: increment(num),
       updatedAt: serverTimestamp(),
+    });
+
+    // step 6 -  Update waitingquuelist put alloted newspapers to end of the list
+    const updatedWaitingQueueList = [...newspapers.slice(num), ...newspapers.slice(0, num)];
+    await updateDoc(joblogicRef, {
+      waitingquuelist: updatedWaitingQueueList,
     });
 
     console.log("🔁 Joblogic ronumbers incremented successfully");
@@ -404,5 +433,218 @@ export const automaticAllocationSendToNewspaper = async (
       message: "Internal Server Error",
       error: error instanceof Error ? error.message : error,
     });
+  }
+};
+
+
+export const automaticAllocationSendToNewspaper = async (req: Request, res: Response) => {
+  const { advertisementId, numOfVendors, user_ref, user_role, platform, screen } = req.body;
+
+  let logStatus = "success";
+  let logMessage = "Automatic allocation completed successfully.";
+  let oldData: any = {};
+  let editedData: any = {};
+  const networkip = req.ip || null;
+
+  if (!advertisementId || !numOfVendors) {
+    throw new Error("Missing required parameters: advertisementId or numOfVendors");
+  }
+
+  // 🔹 Prepare data
+  const adRef = doc(db, "Advertisement", advertisementId);
+  const adSnap = await getDoc(adRef);
+  if (!adSnap.exists()) throw new Error("Advertisement not found");
+  oldData = adSnap.data();
+
+  const jobLogicSnap = await getDocs(collection(db, "joblogic"));
+  if (jobLogicSnap.empty) throw new Error("Joblogic not found");
+  const joblogicDoc = jobLogicSnap.docs[0];
+  if (!joblogicDoc) throw new Error("Joblogic document not found");
+  const joblogicRef = doc(db, "joblogic", joblogicDoc.id);
+  const jobLogicData = joblogicDoc.data();
+
+  const ronumbers = jobLogicData.ronumbers || 0;
+  const newspapers = jobLogicData.waitingquuelist || [];
+  const allotednewspapers: string[] = [];
+  for (let i = 0; i < Number(numOfVendors); i++) {
+    allotednewspapers.push(newspapers[i % newspapers.length]);
+  }
+
+  // 🔹 Calculate due time (7 PM IST today)
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const now = new Date();
+  const nowIST = new Date(now.getTime() + istOffsetMs);
+  const dueIST = new Date(nowIST.getFullYear(), nowIST.getMonth(), nowIST.getDate(), 19, 0, 0, 0);
+  const dueUTC = new Date(dueIST.getTime());
+  let joballocationData: any = [];
+  let vendorMailList: any = [];
+  const newsPaperList: string[] = [];
+  try {
+    // 🔹 Transaction
+    const result = await runTransaction(db, async (transaction) => {
+      // 1. Update Advertisement
+      transaction.update(adRef, {
+        allotednewspapers,
+        Status_Deputy: 2,
+        Status_Vendor: 1,
+        Status_Caseworker: 5,
+        approved: true,
+        Is_CaseWorker: true,
+        DateOfApproval: serverTimestamp(),
+        isDarft: false,
+        approvedstatus: 0,
+        updatedAt: serverTimestamp(),
+        Release_order_no: `DIPR/ARN/${ronumbers}`,
+      });
+
+      // 2. Create NewspaperJobAllocation docs
+      for (let i = 0; i < numOfVendors; i++) {
+        const vendorRefPath = allotednewspapers[i];
+        // console.log("value", vendorRefPath);
+        let vendorDocRef: DocumentReference<DocumentData> | null = null;
+        vendorDocRef = vendorRefPath as unknown as DocumentReference<DocumentData>;
+
+
+        const allocationPayload = {
+          timeofallotment: serverTimestamp(),
+          acknowledgedboolean: false,
+          newspaperrefuserref: vendorDocRef,
+          adref: adRef,
+          completed: false,
+          aprovedcw: true,
+          invoiceraised: false,
+          duetime: dueUTC,
+          ronumber: `DIPR/ARN/${ronumbers + i}`,
+          createdAt: serverTimestamp(),
+        };
+        const allocationRef = doc(collection(db, "NewspaperJobAllocation"));
+        transaction.set(allocationRef, allocationPayload);
+        // console.log(`📰 Created allocation for vendor ${vendorDocRef}`);
+        if (!vendorDocRef) continue;
+        const userSnap = await getDoc(vendorDocRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          if (userData) {
+            vendorMailList.push({
+              to: userData.email || "",
+              roNumber: `DIPR/ARN/${ronumbers + i}`,
+              addressTo: "Technical Assistant",
+            });
+            if (userData.display_name) {
+              newsPaperList.push(userData.display_name);
+            }
+          }
+        }
+      }
+
+      // 3. Increment ronumber and rotate queue
+      const updatedQueue = [...newspapers.slice(numOfVendors), ...newspapers.slice(0, numOfVendors)];
+      transaction.update(joblogicRef, {
+        ronumbers: increment(numOfVendors),
+        waitingquuelist: updatedQueue,
+        updatedAt: serverTimestamp(),
+      });
+
+      return { allotednewspapers, ronumbers, numOfVendors };
+    });
+    console.log("✅ Transaction committed successfully");
+
+    //mail logic to vendors
+    for (const mail of vendorMailList) {
+      try {
+        await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(mail),
+        });
+        console.log(`Email sent to ${mail.to}`);
+      } catch (err: any) {
+        console.error(`Failed to send email to ${mail.to}:`, err.message);
+      }
+    }
+    // Send mail to department
+    const advertisementNumber = adSnap.data().AdvertisementId || "";
+    const to = adSnap.data().Bearingno || "";
+    try {
+      await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to,
+          advertisementNumber,
+          cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+          listOfNewspapers: newsPaperList,
+        }),
+      });
+      console.log(`Email sent to department`, to);
+    } catch (err: Error | any) {
+      console.error(`Failed to send email to ${to}:`, err.message);
+    }
+
+    editedData = { allotednewspapers: result.allotednewspapers };
+    logStatus = "success";
+    logMessage = `Automatic allocation successful for ${numOfVendors} vendors.`;
+
+
+    // ✅ Log success
+    const actionLog = new ActionLog({
+      user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+      islogin: false,
+      rodocref: adRef,
+      ronumber: `DIPR/ARN/${ronumbers}`,
+      old_data: oldData,
+      edited_data: editedData,
+      user_role,
+      action: 6, // example action code
+      message: logMessage,
+      status: logStatus,
+      platform: platform || PlatformType.WEB,
+      networkip,
+      screen: screen,
+      Newspaper_allocation: {
+        Newspaper: allotednewspapers,
+        allotedtime: new Date(),
+        allocation_type: AllocationType.AUTOMATIC,
+        allotedby: user_ref ? doc(db, "Users", user_ref) : null,
+      },
+    });
+    await addDoc(collection(db, "actionLogs"), { ...actionLog });
+
+    return res.status(200).json({
+      success: true,
+      message: logMessage,
+      updatedAdvertisement: advertisementId,
+      allocationsCreated: numOfVendors,
+      joballocationData,
+    });
+  } catch (error: any) {
+    console.error("❌ Transaction failed:", error);
+    logStatus = "error";
+    logMessage = error.message || "Automatic allocation failed.";
+
+    // Log failure
+    const actionLog = new ActionLog({
+      user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+      islogin: false,
+      rodocref: doc(db, "Advertisement", req.body.advertisementId || ""),
+      old_data: oldData,
+      edited_data: editedData,
+      user_role: req.body.user_role || "",
+      action: 6,
+      message: logMessage,
+      status: logStatus,
+      platform: req.body.platform || PlatformType.WEB,
+      networkip: req.body.networkip || "",
+      screen: screen,
+      Newspaper_allocation: {
+        Newspaper: allotednewspapers,
+        allotedtime: new Date(),
+        allocation_type: AllocationType.AUTOMATIC,
+        allotedby: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+      },
+    });
+    await addDoc(collection(db, "actionLogs"), { ...actionLog });
+
+    res.status(500).json({ success: false, message: logMessage, error: error.message });
   }
 };

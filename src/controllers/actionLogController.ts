@@ -74,9 +74,9 @@ export const createActionLog = async (req: Request, res: Response) => {
     ) {
       body.Newspaper_allocation.allotedtime = new Date(body.Newspaper_allocation.allotedtime);
     }
-    if (body.newspaper_job_allocation) {
-      const collectionData = body.newspaper_job_allocation.split("/");
-      body.newspaper_job_allocation =
+    if (body.adRef) {
+      const collectionData = body.adRef.split("/");
+      body.adRef =
         collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
     }
     if (body.note_sheet_allocation) {
@@ -115,6 +115,7 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
       docrefinvoice,
       page = 1,
       limit = 10,
+      adRef,
     } = req.query;
 
     const constraints: QueryConstraint[] = [];
@@ -160,6 +161,20 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
         constraints.push(where("docrefinvoice", "==", invoiceRef));
       } else {
         console.warn(" Invalid docrefinvoice format:", docrefinvoice);
+      }
+    }
+    if (adRef && adRef !== "All") {
+      let collectionData: string[] = [];
+      let adRefDoc: any = null;
+
+      if (typeof adRef === "string") collectionData = adRef.split("/");
+
+      if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+        adRefDoc = doc(db, collectionData[1], collectionData[2]);
+        // console.log("✅ Ad document reference:", adRefDoc.path);
+        constraints.push(where("adRef", "==", adRefDoc));
+      } else {
+        console.warn(" Invalid adRef format:", adRef);
       }
     }
 
