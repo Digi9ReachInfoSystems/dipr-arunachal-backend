@@ -9,7 +9,7 @@ export declare enum PlatformType {
     WEB = "Web"
 }
 export interface NewspaperAllocation {
-    Newspaper: string[];
+    Newspaper: DocumentReference[];
     allotedtime: Date | null;
     allocation_type: AllocationType | null;
     allotedby: DocumentReference | null;
