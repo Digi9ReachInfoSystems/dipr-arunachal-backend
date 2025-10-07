@@ -3,6 +3,7 @@ import moment from "moment-timezone";
 import db from "../configs/firebase.js";
 import Advertisement, {} from "../models/advertisementModel.js";
 import ActionLog, { AllocationType, PlatformType } from "../models/actionLogModel.js";
+import { all } from "axios";
 export const createAdvertisement = async (req, res) => {
     try {
         if (req.body.approvednewspaperslocal && req.body.approvednewspaperslocal.length > 0) {
@@ -195,186 +196,195 @@ export const editAdvertisement = async (req, res) => {
         });
     }
 };
-export const automaticAllocationSendToNewspaperog = async (req, res) => {
-    try {
-        const { advertisementId, numOfVendors, } = req.body;
-        let logStatus = "success";
-        let logMessage = "Automatic allocation completed successfully.";
-        let oldData = {};
-        let editedData = {};
-        if (!advertisementId || !numOfVendors) {
-            throw new Error("Missing required parameters: advertisementId or numOfVendors");
-        }
-        // step-1 Prepare allotednewspapers array and roNumber
-        const allotednewspapers = [];
-        const jobLogiDataSnapshot = await getDocs(collection(db, "joblogic"));
-        if (jobLogiDataSnapshot.empty) {
-            return res.status(404).json({ message: "Job logic data document does not exist" });
-        }
-        const docSnap = jobLogiDataSnapshot.docs[0];
-        if (!docSnap) {
-            return res.status(404).json({ message: "Job logic data document does not exist" });
-        }
-        const jobLogicData = docSnap.data();
-        const ronumbers = jobLogicData.ronumbers || 0;
-        const newspapers = jobLogicData.waitingquuelist || [];
-        for (let i = 0; i < Number(numOfVendors); i++) {
-            const newspaper = newspapers[i % newspapers.length];
-            allotednewspapers.push(newspaper);
-        }
-        // 🔹 Step 2 — Update Advertisement document
-        const adRef = doc(db, "Advertisement", advertisementId);
-        const adSnap = await getDoc(adRef);
-        if (!adSnap.exists()) {
-            return res.status(404).json({ message: "Advertisement not found" });
-        }
-        await updateDoc(adRef, {
-            allotednewspapers,
-            Status_Deputy: 2,
-            Status_Vendor: 1,
-            Status_Caseworker: 5,
-            approved: true,
-            Is_CaseWorker: true,
-            DateOfApproval: serverTimestamp(),
-            isDarft: false,
-            approvedstatus: 0,
-            updatedAt: serverTimestamp(),
-            Release_order_no: `DIPR/ARN/${ronumbers}`,
-        });
-        console.log("✅ Advertisement updated successfully");
-        // 🔹 Step 3 — Fetch first joblogic document
-        const joblogicSnapshot = await getDocs(collection(db, "joblogic"));
-        const joblogicDoc = joblogicSnapshot.docs[0];
-        if (!joblogicDoc) {
-            return res.status(404).json({ message: "Joblogic document not found" });
-        }
-        const joblogicRef = doc(db, "joblogic", joblogicDoc.id);
-        // 🔹 Step 4 — Create NewspaperJobAllocation documents
-        const num = parseInt(numOfVendors) || allotednewspapers.length;
-        if (num === 0) {
-            return res.status(400).json({ message: "No vendors provided" });
-        }
-        let joballocationData = [];
-        let vendorMailList = [];
-        const newsPaperList = [];
-        const istOffsetMs = 5.5 * 60 * 60 * 1000;
-        const now = new Date();
-        const nowIST = new Date(now.getTime() + istOffsetMs);
-        const dueIST = new Date(nowIST.getFullYear(), nowIST.getMonth(), nowIST.getDate(), 19, 0, 0, 0);
-        const dueUTC = new Date(dueIST.getTime());
-        for (let i = 0; i < num; i++) {
-            const vendorRef = allotednewspapers[i];
-            console.log("value", vendorRef);
-            if (!vendorRef)
-                continue;
-            // ✅ Case 1: vendorRef is already a DocumentReference
-            let vendorDocRef = null;
-            if (vendorRef && typeof vendorRef === "object" && "id" in vendorRef) {
-                vendorDocRef = vendorRef;
-            }
-            // ✅ Case 2: vendorRef is a string path like "Users/abc123"
-            else if (typeof vendorRef === "string") {
-                const collectionData = vendorRef.split("/");
-                if (collectionData.length >= 2 && collectionData[0] && collectionData[1]) {
-                    vendorDocRef = doc(db, collectionData[0], collectionData[1]);
-                }
-            }
-            if (!vendorDocRef) {
-                console.warn(`⚠️ Invalid vendor reference format: ${vendorRef}`);
-                continue;
-            }
-            const allocationPayload = {
-                timeofallotment: serverTimestamp(),
-                acknowledgedboolean: false,
-                newspaperrefuserref: vendorDocRef || null,
-                adref: adRef,
-                completed: false,
-                aprovedcw: true,
-                invoiceraised: false,
-                duetime: dueUTC,
-                ronumber: `DIPR/ARN/${ronumbers + i + 1}`,
-                createdAt: serverTimestamp(),
-            };
-            const allocationDocRef = await addDoc(collection(db, "NewspaperJobAllocation"), allocationPayload);
-            joballocationData.push({ id: allocationDocRef.id, ...allocationPayload });
-            console.log(`📰 Created allocation for vendor ${i + 1}`);
-            const userSnap = await getDoc(vendorDocRef);
-            if (userSnap.exists()) {
-                const userData = userSnap.data();
-                if (userData) {
-                    vendorMailList.push({
-                        to: userData.email || "",
-                        roNumber: `DIPR/ARN/${ronumbers + i}`,
-                        addressTo: "Technical Assistant",
-                    });
-                    if (userData.display_name) {
-                        newsPaperList.push(userData.display_name);
-                    }
-                }
-            }
-        }
-        // 🔹 Step 5 — Increment ronumber counter atomically
-        await updateDoc(joblogicRef, {
-            ronumbers: increment(num),
-            updatedAt: serverTimestamp(),
-        });
-        // step 6 -  Update waitingquuelist put alloted newspapers to end of the list
-        const updatedWaitingQueueList = [...newspapers.slice(num), ...newspapers.slice(0, num)];
-        await updateDoc(joblogicRef, {
-            waitingquuelist: updatedWaitingQueueList,
-        });
-        console.log("🔁 Joblogic ronumbers incremented successfully");
-        //mail logic to vendors
-        for (const mail of vendorMailList) {
-            try {
-                await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(mail),
-                });
-                console.log(`Email sent to ${mail.to}`);
-            }
-            catch (err) {
-                console.error(`Failed to send email to ${mail.to}:`, err.message);
-            }
-        }
-        // Send mail to department
-        const advertisementNumber = adSnap.data().AdvertisementId || "";
-        const to = adSnap.data().Bearingno || "";
-        try {
-            await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    to,
-                    advertisementNumber,
-                    cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
-                    listOfNewspapers: newsPaperList,
-                }),
-            });
-            console.log(`Email sent to department`, to);
-        }
-        catch (err) {
-            console.error(`Failed to send email to ${to}:`, err.message);
-        }
-        // ✅ Success response
-        return res.status(200).json({
-            success: true,
-            message: "Automatic allocation completed successfully.",
-            updatedAdvertisement: advertisementId,
-            allocationsCreated: num,
-            joballocationData,
-        });
-    }
-    catch (error) {
-        console.error("❌ Error in automaticAllocationSendToNewspaper:", error);
-        res.status(500).json({
-            success: false,
-            message: "Internal Server Error",
-            error: error instanceof Error ? error.message : error,
-        });
-    }
-};
+// export const automaticAllocationSendToNewspaperog = async (
+//   req: Request,
+//   res: Response
+// ) => {
+//   try {
+//     const {
+//       advertisementId,
+//       numOfVendors,
+//     } = req.body;
+//     let logStatus = "success";
+//     let logMessage = "Automatic allocation completed successfully.";
+//     let oldData: any = {};
+//     let editedData: any = {};
+//     if (!advertisementId || !numOfVendors) {
+//       throw new Error("Missing required parameters: advertisementId or numOfVendors");
+//     }
+//     // step-1 Prepare allotednewspapers array and roNumber
+//     const allotednewspapers: string[] = [];
+//     const jobLogiDataSnapshot = await getDocs(collection(db, "joblogic"));
+//     if (jobLogiDataSnapshot.empty) {
+//       return res.status(404).json({ message: "Job logic data document does not exist" });
+//     }
+//     const docSnap = jobLogiDataSnapshot.docs[0];
+//     if (!docSnap) {
+//       return res.status(404).json({ message: "Job logic data document does not exist" });
+//     }
+//     const jobLogicData = docSnap.data();
+//     const ronumbers = jobLogicData.ronumbers || 0;
+//     const newspapers = jobLogicData.waitingquuelist || [];
+//     for (let i = 0; i < Number(numOfVendors); i++) {
+//       const newspaper = newspapers[i % newspapers.length];
+//       allotednewspapers.push(newspaper);
+//     }
+//     // 🔹 Step 2 — Update Advertisement document
+//     const adRef = doc(db, "Advertisement", advertisementId);
+//     const adSnap = await getDoc(adRef);
+//     if (!adSnap.exists()) {
+//       return res.status(404).json({ message: "Advertisement not found" });
+//     }
+//     await updateDoc(adRef, {
+//       allotednewspapers,
+//       Status_Deputy: 2,
+//       Status_Vendor: 1,
+//       Status_Caseworker: 5,
+//       approved: true,
+//       Is_CaseWorker: true,
+//       DateOfApproval: serverTimestamp(),
+//       isDarft: false,
+//       approvedstatus: 0,
+//       updatedAt: serverTimestamp(),
+//       Release_order_no: `DIPR/ARN/${ronumbers}`,
+//     });
+//     console.log("✅ Advertisement updated successfully");
+//     // 🔹 Step 3 — Fetch first joblogic document
+//     const joblogicSnapshot = await getDocs(collection(db, "joblogic"));
+//     const joblogicDoc = joblogicSnapshot.docs[0];
+//     if (!joblogicDoc) {
+//       return res.status(404).json({ message: "Joblogic document not found" });
+//     }
+//     const joblogicRef = doc(db, "joblogic", joblogicDoc.id);
+//     // 🔹 Step 4 — Create NewspaperJobAllocation documents
+//     const num = parseInt(numOfVendors) || allotednewspapers.length;
+//     if (num === 0) {
+//       return res.status(400).json({ message: "No vendors provided" });
+//     }
+//     let joballocationData = [];
+//     let vendorMailList = [];
+//     const newsPaperList: string[] = [];
+//     const istOffsetMs = 5.5 * 60 * 60 * 1000;
+//     const now = new Date();
+//     const nowIST = new Date(now.getTime() + istOffsetMs);
+//     const dueIST = new Date(
+//       nowIST.getFullYear(),
+//       nowIST.getMonth(),
+//       nowIST.getDate(),
+//       19, 0, 0, 0
+//     );
+//     const dueUTC = new Date(dueIST.getTime());
+//     for (let i = 0; i < num; i++) {
+//       const vendorRef = allotednewspapers[i];
+//       console.log("value", vendorRef);
+//       if (!vendorRef) continue;
+//       // ✅ Case 1: vendorRef is already a DocumentReference
+//       let vendorDocRef: DocumentReference<DocumentData> | null = null;
+//       if (vendorRef && typeof vendorRef === "object" && "id" in vendorRef) {
+//         vendorDocRef = vendorRef as DocumentReference<DocumentData>;
+//       }
+//       // ✅ Case 2: vendorRef is a string path like "Users/abc123"
+//       else if (typeof vendorRef === "string") {
+//         const collectionData = vendorRef.split("/");
+//         if (collectionData.length >= 2 && collectionData[0] && collectionData[1]) {
+//           vendorDocRef = doc(db, collectionData[0], collectionData[1]);
+//         }
+//       }
+//       if (!vendorDocRef) {
+//         console.warn(`⚠️ Invalid vendor reference format: ${vendorRef}`);
+//         continue;
+//       }
+//       const allocationPayload = {
+//         timeofallotment: serverTimestamp(),
+//         acknowledgedboolean: false,
+//         newspaperrefuserref: vendorDocRef || null,
+//         adref: adRef,
+//         completed: false,
+//         aprovedcw: true,
+//         invoiceraised: false,
+//         duetime: dueUTC,
+//         ronumber: `DIPR/ARN/${ronumbers + i + 1}`,
+//         createdAt: serverTimestamp(),
+//       };
+//       const allocationDocRef = await addDoc(collection(db, "NewspaperJobAllocation"), allocationPayload);
+//       joballocationData.push({ id: allocationDocRef.id, ...allocationPayload });
+//       console.log(`📰 Created allocation for vendor ${i + 1}`);
+//       const userSnap = await getDoc(vendorDocRef);
+//       if (userSnap.exists()) {
+//         const userData = userSnap.data();
+//         if (userData) {
+//           vendorMailList.push({
+//             // to: userData.email || "",
+//             to: "jayanthbr@digi9.co.in",
+//             roNumber: `DIPR/ARN/${ronumbers + i}`,
+//             addressTo: "Technical Assistant",
+//           });
+//           if (userData.display_name) {
+//             newsPaperList.push(userData.display_name);
+//           }
+//         }
+//       }
+//     }
+//     // 🔹 Step 5 — Increment ronumber counter atomically
+//     await updateDoc(joblogicRef, {
+//       ronumbers: increment(num),
+//       updatedAt: serverTimestamp(),
+//     });
+//     // step 6 -  Update waitingquuelist put alloted newspapers to end of the list
+//     const updatedWaitingQueueList = [...newspapers.slice(num), ...newspapers.slice(0, num)];
+//     await updateDoc(joblogicRef, {
+//       waitingquuelist: updatedWaitingQueueList,
+//     });
+//     console.log("🔁 Joblogic ronumbers incremented successfully");
+//     //mail logic to vendors
+//     for (const mail of vendorMailList) {
+//       try {
+//         const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+//           method: "POST",
+//           headers: { "Content-Type": "application/json" },
+//           body: JSON.stringify(mail),
+//         });
+//         console.log(`Email sent to ${mail.to}`);
+//       } catch (err: any) {
+//         console.error(`Failed to send email to ${mail.to}:`, err.message);
+//       }
+//     }
+//     // Send mail to department
+//     const advertisementNumber = adSnap.data().AdvertisementId || "";
+//     const to = adSnap.data().Bearingno || "";
+//     try {
+//       const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({
+//           // to,
+//           to:"jayanthbr@digi9.co.in",
+//           advertisementNumber,
+//           cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+//           listOfNewspapers: newsPaperList,
+//         }),
+//       });
+//       console.log(`Email sent to department`, to, response);
+//     } catch (err: Error | any) {
+//       console.error(`Failed to send email to ${to}:`, err.message);
+//     }
+//     // ✅ Success response
+//     return res.status(200).json({
+//       success: true,
+//       message: "Automatic allocation completed successfully.",
+//       updatedAdvertisement: advertisementId,
+//       allocationsCreated: num,
+//       joballocationData,
+//     });
+//   } catch (error) {
+//     console.error("❌ Error in automaticAllocationSendToNewspaper:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error instanceof Error ? error.message : error,
+//     });
+//   }
+// };
 export const automaticAllocationSendToNewspaper = async (req, res) => {
     const { advertisementId, numOfVendors, user_ref, user_role, platform, screen } = req.body;
     let logStatus = "success";
@@ -382,6 +392,7 @@ export const automaticAllocationSendToNewspaper = async (req, res) => {
     let oldData = {};
     let editedData = {};
     const networkip = req.ip || null;
+    let successAllocations = [];
     if (!advertisementId || !numOfVendors) {
         throw new Error("Missing required parameters: advertisementId or numOfVendors");
     }
@@ -418,7 +429,7 @@ export const automaticAllocationSendToNewspaper = async (req, res) => {
         // 🔹 Transaction
         const result = await runTransaction(db, async (transaction) => {
             // 1. Update Advertisement
-            transaction.update(adRef, {
+            const updateResult = await transaction.update(adRef, {
                 allotednewspapers,
                 Status_Deputy: 2,
                 Status_Vendor: 1,
@@ -459,7 +470,8 @@ export const automaticAllocationSendToNewspaper = async (req, res) => {
                     const userData = userSnap.data();
                     if (userData) {
                         vendorMailList.push({
-                            to: userData.email || "",
+                            // to: userData.email || "",
+                            to: "jayanthbr@digi9.co.in",
                             roNumber: `DIPR/ARN/${ronumbers + i}`,
                             addressTo: "Technical Assistant",
                         });
@@ -468,6 +480,8 @@ export const automaticAllocationSendToNewspaper = async (req, res) => {
                         }
                     }
                 }
+                successAllocations.push({ ref: allocationRef, payload: allocationPayload });
+                joballocationData.push({ id: allocationRef.id, ...allocationPayload });
             }
             // 3. Increment ronumber and rotate queue
             const updatedQueue = [...newspapers.slice(numOfVendors), ...newspapers.slice(0, numOfVendors)];
@@ -476,18 +490,18 @@ export const automaticAllocationSendToNewspaper = async (req, res) => {
                 waitingquuelist: updatedQueue,
                 updatedAt: serverTimestamp(),
             });
-            return { allotednewspapers, ronumbers, numOfVendors };
+            return { allotednewspapers, ronumbers, numOfVendors, successAllocations };
         });
         console.log("✅ Transaction committed successfully");
         //mail logic to vendors
         for (const mail of vendorMailList) {
             try {
-                await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(mail),
                 });
-                console.log(`Email sent to ${mail.to}`);
+                console.log(`Email sent to ${mail.to}`, response);
             }
             catch (err) {
                 console.error(`Failed to send email to ${mail.to}:`, err.message);
@@ -497,17 +511,18 @@ export const automaticAllocationSendToNewspaper = async (req, res) => {
         const advertisementNumber = adSnap.data().AdvertisementId || "";
         const to = adSnap.data().Bearingno || "";
         try {
-            await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+            const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    to,
+                    //   to,
+                    to: "jayanthbr@digi9.co.in",
                     advertisementNumber,
                     cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
                     listOfNewspapers: newsPaperList,
                 }),
             });
-            console.log(`Email sent to department`, to);
+            console.log(`Email sent to department`, to, res);
         }
         catch (err) {
             console.error(`Failed to send email to ${to}:`, err.message);
@@ -516,34 +531,41 @@ export const automaticAllocationSendToNewspaper = async (req, res) => {
         logStatus = "success";
         logMessage = `Automatic allocation successful for ${numOfVendors} vendors.`;
         // ✅ Log success
-        const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: adRef,
-            ronumber: `DIPR/ARN/${ronumbers}`,
-            old_data: oldData,
-            edited_data: editedData,
-            user_role,
-            action: 6, // example action code
-            message: logMessage,
-            status: logStatus,
-            platform: platform || PlatformType.WEB,
-            networkip,
-            screen: screen,
-            Newspaper_allocation: {
-                Newspaper: allotednewspapers,
-                allotedtime: new Date(),
-                allocation_type: AllocationType.AUTOMATIC,
-                allotedby: user_ref ? doc(db, "Users", user_ref) : null,
-            },
-        });
-        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        const actionLogRefs = [];
+        for (const { ref: allocRef, payload } of result.successAllocations) {
+            const actionLog = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: allocRef, // each allocation doc ref
+                ronumber: payload.ronumber,
+                old_data: oldData,
+                edited_data: payload,
+                user_role,
+                action: 1,
+                message: "Automatic allocation successful",
+                status: "success",
+                platform: platform,
+                networkip,
+                screen,
+                Newspaper_allocation: {
+                    Newspaper: allotednewspapers,
+                    allotedtime: new Date(),
+                    allocation_type: AllocationType.AUTOMATIC,
+                    allotedby: user_ref ? doc(db, "Users", user_ref) : null,
+                },
+                adRef: allocRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+            });
+            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            actionLogRefs.push(actionLogRef.id);
+        }
         return res.status(200).json({
             success: true,
             message: logMessage,
             updatedAdvertisement: advertisementId,
             allocationsCreated: numOfVendors,
             joballocationData,
+            actionLogId: actionLogRefs,
         });
     }
     catch (error) {
@@ -551,27 +573,277 @@ export const automaticAllocationSendToNewspaper = async (req, res) => {
         logStatus = "error";
         logMessage = error.message || "Automatic allocation failed.";
         // Log failure
-        const actionLog = new ActionLog({
-            user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
-            islogin: false,
-            rodocref: doc(db, "Advertisement", req.body.advertisementId || ""),
-            old_data: oldData,
-            edited_data: editedData,
-            user_role: req.body.user_role || "",
-            action: 6,
-            message: logMessage,
-            status: logStatus,
-            platform: req.body.platform || PlatformType.WEB,
-            networkip: req.body.networkip || "",
-            screen: screen,
-            Newspaper_allocation: {
-                Newspaper: allotednewspapers,
-                allotedtime: new Date(),
-                allocation_type: AllocationType.AUTOMATIC,
-                allotedby: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
-            },
+        for (const alloc of successAllocations) {
+            const actionLog = new ActionLog({
+                user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+                islogin: false,
+                rodocref: alloc.ref,
+                ronumber: alloc.payload?.ronumber,
+                old_data: oldData,
+                edited_data: alloc.payload,
+                user_role: req.body.user_role || "",
+                action: 6,
+                message: `Automatic allocation failed: ${error.message}`,
+                status: "failed",
+                platform: req.body.platform,
+                networkip,
+                screen: req.body.screen,
+                Newspaper_allocation: {
+                    Newspaper: allotednewspapers,
+                    allotedtime: new Date(),
+                    allocation_type: AllocationType.AUTOMATIC,
+                    allotedby: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+                },
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+                adRef: adRef,
+            });
+            await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        }
+        res.status(500).json({ success: false, message: logMessage, error: error.message });
+    }
+};
+export const manualAllocationSendToNewspaper = async (req, res) => {
+    const { advertisementId, user_ref, user_role, platform, screen, allotedNewspapers } = req.body;
+    let logStatus = "success";
+    let logMessage = "Automatic allocation completed successfully.";
+    let oldData = {};
+    let editedData = {};
+    const networkip = req.ip || null;
+    let successAllocations = [];
+    if (!advertisementId || !allotedNewspapers || allotedNewspapers.length === 0) {
+        throw new Error("Missing required parameters: advertisementId  or allotedNewspapers");
+    }
+    const numOfVendors = allotedNewspapers.length;
+    // 🔹 Prepare data
+    const adRef = doc(db, "Advertisement", advertisementId);
+    const adSnap = await getDoc(adRef);
+    if (!adSnap.exists())
+        throw new Error("Advertisement not found");
+    oldData = adSnap.data();
+    const jobLogicSnap = await getDocs(collection(db, "joblogic"));
+    if (jobLogicSnap.empty)
+        throw new Error("Joblogic not found");
+    const joblogicDoc = jobLogicSnap.docs[0];
+    if (!joblogicDoc)
+        throw new Error("Joblogic document not found");
+    const joblogicRef = doc(db, "joblogic", joblogicDoc.id);
+    const jobLogicData = joblogicDoc.data();
+    const ronumbers = jobLogicData.ronumbers || 0;
+    const newspapers = jobLogicData.waitingquuelist || [];
+    let allotednewspapers = [];
+    if (allotedNewspapers && allotedNewspapers.length > 0) {
+        const collectionData = allotedNewspapers.map((ref) => {
+            const parts = ref.split("/");
+            console.log("parts", parts);
+            if (parts.length >= 2 && parts[2] && parts[1]) {
+                return doc(db, parts[1], parts[2]); // keep as string path
+            }
+            return null;
         });
-        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.log("collectionData", collectionData);
+        allotednewspapers = collectionData.filter(Boolean);
+    }
+    console.log("allotednewspapers", allotednewspapers);
+    // 🔹 Calculate due time (7 PM IST today)
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const now = new Date();
+    const nowIST = new Date(now.getTime() + istOffsetMs);
+    const dueIST = new Date(nowIST.getFullYear(), nowIST.getMonth(), nowIST.getDate(), 19, 0, 0, 0);
+    const dueUTC = new Date(dueIST.getTime());
+    let joballocationData = [];
+    let vendorMailList = [];
+    const newsPaperList = [];
+    try {
+        // 🔹 Transaction
+        const result = await runTransaction(db, async (transaction) => {
+            // 1. Update Advertisement
+            const updateResult = await transaction.update(adRef, {
+                allotednewspapers,
+                Status_Deputy: 0,
+                Status_Vendor: 1,
+                Status_Caseworker: 5,
+                approved: true,
+                Is_CaseWorker: true,
+                DateOfApproval: serverTimestamp(),
+                isDarft: false,
+                approvedstatus: 0,
+                updatedAt: serverTimestamp(),
+                Release_order_no: `DIPR/ARN/${ronumbers}`,
+                IsrequesPending: false,
+                manuallyallotted: true,
+            });
+            // 2. Create NewspaperJobAllocation docs
+            for (let i = 0; i < numOfVendors; i++) {
+                const vendorRefPath = allotednewspapers[i];
+                // console.log("value", vendorRefPath);
+                let vendorDocRef = null;
+                vendorDocRef = vendorRefPath;
+                const allocationPayload = {
+                    timeofallotment: serverTimestamp(),
+                    acknowledgedboolean: false,
+                    newspaperrefuserref: vendorDocRef,
+                    adref: adRef,
+                    completed: false,
+                    aprovedcw: false,
+                    invoiceraised: false,
+                    duetime: dueUTC,
+                    ronumber: `DIPR/ARN/${ronumbers + i}`,
+                    createdAt: serverTimestamp(),
+                };
+                const allocationRef = doc(collection(db, "NewspaperJobAllocation"));
+                console.log("allocationRef", allocationRef);
+                console.log("allocationPayload", allocationPayload);
+                transaction.set(allocationRef, allocationPayload);
+                // console.log(`📰 Created allocation for vendor ${vendorDocRef}`);
+                if (!vendorDocRef)
+                    continue;
+                const userSnap = await getDoc(vendorDocRef);
+                if (userSnap.exists()) {
+                    const userData = userSnap.data();
+                    if (userData) {
+                        vendorMailList.push({
+                            to: userData.email || "",
+                            roNumber: `DIPR/ARN/${ronumbers + i}`,
+                            addressTo: "Technical Assistant",
+                        });
+                        if (userData.display_name) {
+                            newsPaperList.push(userData.display_name);
+                        }
+                    }
+                }
+                successAllocations.push({ ref: allocationRef, payload: allocationPayload });
+                joballocationData.push({ id: allocationRef.id, ...allocationPayload });
+            }
+            // 3. Increment ronumber and rotate queue
+            // For manual allocation, we do not rotate the queue as per original logic just keep the same order and move the mentioned newspapers to the end
+            console.log("newspapers", newspapers);
+            const updatedQueue = [
+                // Keep existing newspaper refs that weren’t just allotted
+                ...newspapers.filter((np) => {
+                    const npId = typeof np === "string" ? np.split("/").pop() : np?.id;
+                    return !allotednewspapers.some((ref) => {
+                        const refId = typeof ref === "string" ? ref.split("/").pop() : ref?.id;
+                        return npId === refId;
+                    });
+                }),
+                // Add the newly allotted refs (as DocumentReferences)
+                ...allotednewspapers.map((ref) => {
+                    if (typeof ref === "string") {
+                        const collectionData = ref.split("/");
+                        if (collectionData.length >= 2 && collectionData[2] && collectionData[1]) {
+                            return doc(db, collectionData[1], collectionData[2]);
+                        }
+                    }
+                    return ref;
+                }),
+            ];
+            transaction.update(joblogicRef, {
+                ronumbers: increment(numOfVendors),
+                waitingquuelist: updatedQueue,
+                updatedAt: serverTimestamp(),
+            });
+            return { allotednewspapers, ronumbers, numOfVendors, successAllocations };
+        });
+        console.log("✅ Transaction committed successfully");
+        // Send mail to department
+        const userEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        let to = "";
+        if (!userEmailSnap.empty) {
+            const userEmailDoc = userEmailSnap.docs[0];
+            if (userEmailDoc) {
+                to = userEmailDoc.data().ddipradvtgmailcom || "";
+            }
+        }
+        const advertisementNumber = adSnap.data().AdvertisementId || "";
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to,
+                    // to: "jayanthbr@digi9.co.in",
+                    advertisementNumber,
+                    cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+                    listOfNewspapers: newsPaperList,
+                }),
+            });
+            console.log(`Email sent to department`, to, response);
+        }
+        catch (err) {
+            console.error(`Failed to send email to ${to}:`, err.message);
+        }
+        editedData = { allotednewspapers: result.allotednewspapers };
+        logStatus = "success";
+        logMessage = `Automatic allocation successful for ${numOfVendors} vendors.`;
+        // ✅ Log success
+        const actionLogRefs = [];
+        for (const { ref: allocRef, payload } of result.successAllocations) {
+            const actionLog = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: allocRef, // each allocation doc ref
+                ronumber: payload.ronumber,
+                old_data: oldData,
+                edited_data: payload,
+                user_role,
+                action: 1,
+                message: "Automatic allocation successful",
+                status: "success",
+                platform: platform,
+                networkip,
+                screen,
+                Newspaper_allocation: {
+                    Newspaper: allotednewspapers,
+                    allotedtime: new Date(),
+                    allocation_type: AllocationType.AUTOMATIC,
+                    allotedby: user_ref ? doc(db, "Users", user_ref) : null,
+                },
+                adRef: allocRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+            });
+            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            actionLogRefs.push(actionLogRef.id);
+        }
+        return res.status(200).json({
+            success: true,
+            message: logMessage,
+            updatedAdvertisement: advertisementId,
+            allocationsCreated: numOfVendors,
+            joballocationData,
+            actionLogId: actionLogRefs,
+        });
+    }
+    catch (error) {
+        console.error("❌ Transaction failed:", error);
+        logStatus = "error";
+        logMessage = error.message || "Automatic allocation failed.";
+        // Log failure
+        for (const alloc of successAllocations) {
+            const actionLog = new ActionLog({
+                user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+                islogin: false,
+                rodocref: alloc.ref,
+                ronumber: alloc.payload?.ronumber,
+                old_data: oldData,
+                edited_data: alloc.payload,
+                user_role: req.body.user_role || "",
+                action: 6,
+                message: `Automatic allocation failed: ${error.message}`,
+                status: "failed",
+                platform: req.body.platform,
+                networkip,
+                screen: req.body.screen,
+                Newspaper_allocation: {
+                    Newspaper: allotednewspapers,
+                    allotedtime: new Date(),
+                    allocation_type: AllocationType.AUTOMATIC,
+                    allotedby: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+                },
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+                adRef: adRef,
+            });
+            await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        }
         res.status(500).json({ success: false, message: logMessage, error: error.message });
     }
 };
