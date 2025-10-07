@@ -4,6 +4,7 @@ import {
     createAdvertisement,
     editAdvertisement,
     getAdvertisementById,
+    manualAllocationSendToNewspaper,
 }
     from "../controllers/advertisementController.js";
 
@@ -12,4 +13,5 @@ router.post("/createReleaseOrder", createAdvertisement);
 router.get("/getAdvertisements/byId/:id",getAdvertisementById);
 router.put("/updateDraftAdvertisement/:id", editAdvertisement);
 router.post("/automaticAllocation/sendToNewspaper", automaticAllocationSendToNewspaper);
+router.post("/manualAllocation/sendToNewspaper", manualAllocationSendToNewspaper);
 export default router;
