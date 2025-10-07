@@ -36,7 +36,7 @@ export interface ActionLogProps {
   networkip?: string | null;
   screen?: string;
   Newspaper_allocation?: Partial<NewspaperAllocation>;
-  newspaper_job_allocation?: DocumentReference | null;
+  adRef?: DocumentReference | null;
   note_sheet_allocation?: DocumentReference | null;
 }
 
@@ -58,7 +58,7 @@ export default class ActionLog {
   networkip: string | null;
   screen: string;
   Newspaper_allocation: NewspaperAllocation;
-  newspaper_job_allocation: DocumentReference | null;
+  adRef: DocumentReference | null;
   note_sheet_allocation: DocumentReference | null;
   constructor({
     user_ref = null,
@@ -83,7 +83,7 @@ export default class ActionLog {
       allocation_type: null,
       allotedby: null,
     },
-    newspaper_job_allocation = null,
+    adRef = null,
     note_sheet_allocation = null,
   }: ActionLogProps) {
     this.user_ref = user_ref;
@@ -120,7 +120,7 @@ export default class ActionLog {
           : null,
       allotedby: Newspaper_allocation?.allotedby || null,
     };
-    this.newspaper_job_allocation = newspaper_job_allocation;
+    this.adRef = adRef;
     this.note_sheet_allocation = note_sheet_allocation;
   }
 

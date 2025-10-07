@@ -47,9 +47,9 @@ export const createActionLog = async (req, res) => {
             typeof body.Newspaper_allocation.allotedtime === "string") {
             body.Newspaper_allocation.allotedtime = new Date(body.Newspaper_allocation.allotedtime);
         }
-        if (body.newspaper_job_allocation) {
-            const collectionData = body.newspaper_job_allocation.split("/");
-            body.newspaper_job_allocation =
+        if (body.adRef) {
+            const collectionData = body.adRef.split("/");
+            body.adRef =
                 collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
         }
         if (body.note_sheet_allocation) {
@@ -70,7 +70,7 @@ export const createActionLog = async (req, res) => {
 // ✅ Get All ActionLogs with filters + pagination
 export const getAllActionLogs = async (req, res) => {
     try {
-        const { user_ref, islogin, rodocref, user_role, action, status, platform, screen, allocation_type, actionDate, email, note_sheet_allocation, docrefinvoice, page = 1, limit = 10, } = req.query;
+        const { user_ref, islogin, rodocref, user_role, action, status, platform, screen, allocation_type, actionDate, email, note_sheet_allocation, docrefinvoice, page = 1, limit = 10, adRef, } = req.query;
         const constraints = [];
         if (user_ref && user_ref !== "All") {
             let collectionData = [];
@@ -112,6 +112,20 @@ export const getAllActionLogs = async (req, res) => {
             }
             else {
                 console.warn(" Invalid docrefinvoice format:", docrefinvoice);
+            }
+        }
+        if (adRef && adRef !== "All") {
+            let collectionData = [];
+            let adRefDoc = null;
+            if (typeof adRef === "string")
+                collectionData = adRef.split("/");
+            if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+                adRefDoc = doc(db, collectionData[1], collectionData[2]);
+                // console.log("✅ Ad document reference:", adRefDoc.path);
+                constraints.push(where("adRef", "==", adRefDoc));
+            }
+            else {
+                console.warn(" Invalid adRef format:", adRef);
             }
         }
         if (islogin && islogin !== "All") {
