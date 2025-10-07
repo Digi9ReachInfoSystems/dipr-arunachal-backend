@@ -5,7 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import axios from "axios";
-
+import os from "os";
 // Load env variables
 dotenv.config();
 
@@ -61,14 +61,34 @@ app.use("/advertisement", advertisementRoute);
 
 // Root endpoint
 app.get("/", (_req: Request, res: Response) => {
-  if (process.env.NODE_ENV == 'production') {
-    res.send("Server is running healthy  in production mode");
-    return;
-  } else if (process.env.NODE_ENV == 'development') {
-    res.send("Server is running healthy  in development mode");
-  } else {
-    res.send("Server is running healthy ");
-  } 
+  const env = process.env.NODE_ENV || "local";
+
+  // Build response payload
+  const response = {
+    status: "ok",
+    message:
+      env === "production"
+        ? "Server is running healthy in production mode"
+        : env === "development"
+        ? "Server is running healthy in development mode"
+        : "Server is running healthy",
+    environment: env,
+    uptime: process.uptime(), // seconds since start
+    timestamp: new Date().toISOString(),
+    hostname: os.hostname(),
+    region: process.env.VERCEL_REGION || process.env.REGION || "unknown",
+    nodeVersion: process.version,
+    memoryUsage: process.memoryUsage().heapUsed / 1024 / 1024 + " MB",
+    vercel: {
+      env: process.env.VERCEL_ENV || "local", // 'production' | 'preview' | 'development'
+      gitCommit: process.env.VERCEL_GIT_COMMIT_SHA || null,
+      gitBranch: process.env.VERCEL_GIT_COMMIT_REF || null,
+      deploymentUrl: process.env.VERCEL_URL || null,
+      project: process.env.VERCEL_PROJECT_PRODUCTION_URL || null,
+    },
+  };
+
+  res.status(200).json(response);
 });
 
 // Start the Server

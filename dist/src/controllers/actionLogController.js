@@ -70,11 +70,49 @@ export const createActionLog = async (req, res) => {
 // ✅ Get All ActionLogs with filters + pagination
 export const getAllActionLogs = async (req, res) => {
     try {
-        const { user_ref, islogin, rodocref, user_role, action, status, platform, screen, allocation_type, actionDate, email, page = 1, limit = 10, } = req.query;
+        const { user_ref, islogin, rodocref, user_role, action, status, platform, screen, allocation_type, actionDate, email, note_sheet_allocation, docrefinvoice, page = 1, limit = 10, } = req.query;
         const constraints = [];
         if (user_ref && user_ref !== "All") {
-            const userRef = doc(db, "Users", String(user_ref));
-            constraints.push(where("user_ref", "==", userRef));
+            let collectionData = [];
+            let userRef = null;
+            if (typeof user_ref === "string")
+                collectionData = user_ref.split("/");
+            if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+                userRef = doc(db, collectionData[1], collectionData[2]);
+                // console.log("✅ User document reference:", userRef.path);
+                constraints.push(where("user_ref", "==", userRef));
+            }
+            else {
+                console.warn("⚠️ Invalid user_ref format:", user_ref);
+            }
+        }
+        if (note_sheet_allocation && note_sheet_allocation !== "All") {
+            let collectionData = [];
+            let noteSheetRef = null;
+            if (typeof note_sheet_allocation === "string")
+                collectionData = note_sheet_allocation.split("/");
+            if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+                noteSheetRef = doc(db, collectionData[1], collectionData[2]);
+                // console.log("✅ NoteSheet document reference:", noteSheetRef.path);
+                constraints.push(where("note_sheet_allocation", "==", noteSheetRef));
+            }
+            else {
+                console.warn("⚠️ Invalid note_sheet_allocation format:", note_sheet_allocation);
+            }
+        }
+        if (docrefinvoice && docrefinvoice !== "All") {
+            let collectionData = [];
+            let invoiceRef = null;
+            if (typeof docrefinvoice === "string")
+                collectionData = docrefinvoice.split("/");
+            if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+                invoiceRef = doc(db, collectionData[1], collectionData[2]);
+                console.log("✅ Invoice document reference:", invoiceRef.path);
+                constraints.push(where("docrefinvoice", "==", invoiceRef));
+            }
+            else {
+                console.warn("⚠️ Invalid docrefinvoice format:", docrefinvoice);
+            }
         }
         if (islogin && islogin !== "All") {
             constraints.push(where("islogin", "==", String(islogin) === "true"));

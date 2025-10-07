@@ -74,12 +74,12 @@ export const createActionLog = async (req: Request, res: Response) => {
     ) {
       body.Newspaper_allocation.allotedtime = new Date(body.Newspaper_allocation.allotedtime);
     }
-    if(body.newspaper_job_allocation) {
+    if (body.newspaper_job_allocation) {
       const collectionData = body.newspaper_job_allocation.split("/");
       body.newspaper_job_allocation =
         collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
     }
-    if(body.note_sheet_allocation) {
+    if (body.note_sheet_allocation) {
       const collectionData = body.note_sheet_allocation.split("/");
       body.note_sheet_allocation =
         collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
@@ -90,7 +90,7 @@ export const createActionLog = async (req: Request, res: Response) => {
 
     const docRef = await addDoc(actionLogsRef, { ...log });
     res.status(201).json({ success: true, message: "ActionLog created", id: docRef.id });
-  } catch (error: Error |any) {
+  } catch (error: Error | any) {
     console.error(error);
     handleError(res, error);
   }
@@ -111,6 +111,8 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
       allocation_type,
       actionDate,
       email,
+      note_sheet_allocation,
+      docrefinvoice,
       page = 1,
       limit = 10,
     } = req.query;
@@ -118,8 +120,47 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
     const constraints: QueryConstraint[] = [];
 
     if (user_ref && user_ref !== "All") {
-      const userRef = doc(db, "Users", String(user_ref));
-      constraints.push(where("user_ref", "==", userRef));
+      let collectionData: string[] = [];
+      let userRef: any = null;
+
+      if (typeof user_ref === "string") collectionData = user_ref.split("/");
+
+      if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+        userRef = doc(db, collectionData[1], collectionData[2]);
+        // console.log("✅ User document reference:", userRef.path);
+        constraints.push(where("user_ref", "==", userRef));
+      } else {
+        console.warn("⚠️ Invalid user_ref format:", user_ref);
+      }
+    }
+    if (note_sheet_allocation && note_sheet_allocation !== "All") {
+      let collectionData: string[] = [];
+      let noteSheetRef: any = null;
+
+      if (typeof note_sheet_allocation === "string")
+        collectionData = note_sheet_allocation.split("/");
+
+      if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+        noteSheetRef = doc(db, collectionData[1], collectionData[2]);
+        // console.log("✅ NoteSheet document reference:", noteSheetRef.path);
+        constraints.push(where("note_sheet_allocation", "==", noteSheetRef));
+      } else {
+        console.warn("⚠️ Invalid note_sheet_allocation format:", note_sheet_allocation);
+      }
+    }
+    if (docrefinvoice && docrefinvoice !== "All") {
+      let collectionData: string[] = [];
+      let invoiceRef: any = null;
+
+      if (typeof docrefinvoice === "string") collectionData = docrefinvoice.split("/");
+
+      if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+        invoiceRef = doc(db, collectionData[1], collectionData[2]);
+        console.log("✅ Invoice document reference:", invoiceRef.path);
+        constraints.push(where("docrefinvoice", "==", invoiceRef));
+      } else {
+        console.warn("⚠️ Invalid docrefinvoice format:", docrefinvoice);
+      }
     }
 
     if (islogin && islogin !== "All") {
@@ -199,7 +240,7 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
       count: logs.length,
       data: logs,
     });
-  } catch (error: Error |any) {
+  } catch (error: Error | any) {
     console.error("Error in getAllActionLogs:", error);
     handleError(res, error);
   }
@@ -219,7 +260,7 @@ export const getActionLogById = async (req: Request, res: Response) => {
     }
 
     res.status(200).json({ success: true, id: snapshot.id, data: snapshot.data() });
-  } catch (error: Error |any) {
+  } catch (error: Error | any) {
     console.error("Error in getActionLogById:", error);
     handleError(res, error);
   }
@@ -234,7 +275,7 @@ export const deleteActionLog = async (req: Request, res: Response) => {
     const logRef = doc(db, "actionLogs", id);
     await deleteDoc(logRef);
     res.status(200).json({ success: true, message: "ActionLog deleted successfully" });
-  } catch (error: Error |any) {
+  } catch (error: Error | any) {
     console.error("Error in deleteActionLog:", error);
     handleError(res, error);
   }
