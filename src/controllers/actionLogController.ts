@@ -130,7 +130,7 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
         // console.log("✅ User document reference:", userRef.path);
         constraints.push(where("user_ref", "==", userRef));
       } else {
-        console.warn("⚠️ Invalid user_ref format:", user_ref);
+        console.warn(" Invalid user_ref format:", user_ref);
       }
     }
     if (note_sheet_allocation && note_sheet_allocation !== "All") {
@@ -145,7 +145,7 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
         // console.log("✅ NoteSheet document reference:", noteSheetRef.path);
         constraints.push(where("note_sheet_allocation", "==", noteSheetRef));
       } else {
-        console.warn("⚠️ Invalid note_sheet_allocation format:", note_sheet_allocation);
+        console.warn(" Invalid note_sheet_allocation format:", note_sheet_allocation);
       }
     }
     if (docrefinvoice && docrefinvoice !== "All") {
@@ -156,10 +156,10 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
 
       if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
         invoiceRef = doc(db, collectionData[1], collectionData[2]);
-        console.log("✅ Invoice document reference:", invoiceRef.path);
+        // console.log("✅ Invoice document reference:", invoiceRef.path);
         constraints.push(where("docrefinvoice", "==", invoiceRef));
       } else {
-        console.warn("⚠️ Invalid docrefinvoice format:", docrefinvoice);
+        console.warn(" Invalid docrefinvoice format:", docrefinvoice);
       }
     }
 
@@ -172,8 +172,16 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
     }
 
     if (rodocref && rodocref !== "All") {
-      const rodocrefRef = doc(db, "Advertisement", String(rodocref));
-      constraints.push(where("rodocref", "==", rodocrefRef));
+      let collectionData: string[] = [];
+      let rodocrefRef: any = null;
+      if (typeof rodocref === "string") collectionData = rodocref.split("/");
+      if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
+        rodocrefRef = doc(db, collectionData[1], collectionData[2]);
+        // console.log("✅ RO document reference:", rodocrefRef.path);
+        constraints.push(where("rodocref", "==", rodocrefRef));
+      } else {
+        console.warn(" Invalid rodocref format:", rodocref);
+      }
     }
 
     if (user_role && user_role !== "All") {
