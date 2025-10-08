@@ -1,9 +1,12 @@
 import express from "express";
 import {
+    automaticAllocationSendToDeputy,
     automaticAllocationSendToNewspaper,
     createAdvertisement,
     editAdvertisement,
+    generateAdvertisementReport,
     getAdvertisementById,
+    manualAllocationSendToDeputy,
     manualAllocationSendToNewspaper,
 }
     from "../controllers/advertisementController.js";
@@ -14,4 +17,8 @@ router.get("/getAdvertisements/byId/:id",getAdvertisementById);
 router.put("/updateDraftAdvertisement/:id", editAdvertisement);
 router.post("/automaticAllocation/sendToNewspaper", automaticAllocationSendToNewspaper);
 router.post("/manualAllocation/sendToNewspaper", manualAllocationSendToNewspaper);
+router.post("/automaticAllocation/sendToDeputy", automaticAllocationSendToDeputy);
+router.post("/manualAllocation/sendToDeputy", manualAllocationSendToDeputy);
+router.post("/advertisement/pdf-report", generateAdvertisementReport);
+
 export default router;
