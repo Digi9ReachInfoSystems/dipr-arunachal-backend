@@ -531,8 +531,8 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
           const userData = userSnap.data();
           if (userData) {
             vendorMailList.push({
-              // to: userData.email || "",
-              to: "jayanthbr@digi9.co.in",
+              to: userData.email || "",
+              // to: "jayanthbr@digi9.co.in",
               roNumber: `DIPR/ARN/${ronumbers + i}`,
               addressTo: "Technical Assistant",
             });
@@ -579,8 +579,8 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          //   to,
-          to: "jayanthbr@digi9.co.in",
+            to,
+          // to: "jayanthbr@digi9.co.in",
           advertisementNumber,
           cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
           listOfNewspapers: newsPaperList,
@@ -869,7 +869,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
       const actionLog = new ActionLog({
         user_ref: user_ref ? doc(db, "Users", user_ref) : null,
         islogin: false,
-        rodocref: allocRef, // each allocation doc ref
+        rodocref: allocRef, 
         ronumber: payload.ronumber,
         old_data: oldData,
         edited_data: payload,
@@ -911,7 +911,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
       const actionLog = new ActionLog({
         user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
         islogin: false,
-        rodocref: alloc.ref,
+        rodocref: alloc.ref||null,
         ronumber: alloc.payload?.ronumber,
         old_data: oldData,
         edited_data: alloc.payload,
