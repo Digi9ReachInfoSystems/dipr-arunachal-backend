@@ -6,6 +6,7 @@ import {
     editAdvertisement,
     generateAdvertisementReport,
     getAdvertisementById,
+    getAdvertisementCountByYear,
     manualAllocationSendToDeputy,
     manualAllocationSendToNewspaper,
 }
@@ -20,5 +21,5 @@ router.post("/manualAllocation/sendToNewspaper", manualAllocationSendToNewspaper
 router.post("/automaticAllocation/sendToDeputy", automaticAllocationSendToDeputy);
 router.post("/manualAllocation/sendToDeputy", manualAllocationSendToDeputy);
 router.post("/advertisement/pdf-report", generateAdvertisementReport);
-
+router.get("/stats/advertisement/count/year/:year", getAdvertisementCountByYear);
 export default router;

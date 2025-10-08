@@ -14,6 +14,7 @@ import {
   query,
   orderBy,
   QueryConstraint,
+  and,
 } from "firebase/firestore";
 import { AppError, handleError } from "../utils/errorHandler.js";
 
@@ -303,3 +304,216 @@ export const deleteActionLog = async (req: Request, res: Response) => {
     handleError(res, error);
   }
 };
+
+
+export const getSuccessFailureActionlogCounts = async (req: Request, res: Response) => {
+  try {
+    const successQuery = query(actionLogsRef, where("status", "==", "Success"));
+    const failureQuery = query(actionLogsRef, where("status", "==", "Failed"));
+
+    const loginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"));
+    const loginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"));
+    const allSnap = await getDocs(actionLogsRef);
+    const allDocs = allSnap.docs;
+    const successSnapshot = await getDocs(successQuery);
+    const failureSnapshot = await getDocs(failureQuery);
+    const loginSuccessSnapshot = await getDocs(loginSuccessQuery);
+    const loginFailureSnapshot = await getDocs(loginFailureQuery);
+    const successCount = successSnapshot.size;
+    const failureCount = failureSnapshot.size;
+    const loginSuccessCount = loginSuccessSnapshot.size;
+    const loginFailureCount = loginFailureSnapshot.size;
+    const totalCount = allDocs.length;
+
+    res.status(200).json({ success: true, totalLogs: totalCount, successCount, failureCount, loginSuccessCount, loginFailureCount, });
+  } catch (error: Error | any) {
+    console.error("Error in getSuccessFailureActionlogCounts:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+export const getSuccessFailureActionlogCountsByYear = async (req: Request, res: Response) => {
+  const { year } = req.params;
+  try {
+    const successQuery = query(actionLogsRef, where("status", "==", "Success"), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+    const failureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+
+    const loginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+    const loginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+    const allSnap = await getDocs(actionLogsRef);
+    const allDocs = allSnap.docs;
+    const successSnapshot = await getDocs(successQuery);
+    const failureSnapshot = await getDocs(failureQuery);
+    const loginSuccessSnapshot = await getDocs(loginSuccessQuery);
+    const loginFailureSnapshot = await getDocs(loginFailureQuery);
+    const successCount = successSnapshot.size;
+    const failureCount = failureSnapshot.size;
+    const loginSuccessCount = loginSuccessSnapshot.size;
+    const loginFailureCount = loginFailureSnapshot.size;
+    const totalCount = allDocs.length;
+    const monthlyData = [];
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+
+    for (let month = 0; month < 12; month++) {
+      const start = new Date(Date.UTC(Number(year), month, 1, 0, 0, 0));
+      const end = new Date(Date.UTC(Number(year), month + 1, 0, 23, 59, 59));
+      const monthTotalQuery = query(actionLogsRef, where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthSuccessQuery = query(actionLogsRef, where("status", "==", "Success"), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthFailureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthLoginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthLoginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("actiontime", ">=", start), where("actiontime", "<=", end));
+
+      const [mTotal,mSuccess, mFail, mLoginSuccess, mLoginFail] = await Promise.all([
+        getDocs(monthTotalQuery),
+        getDocs(monthSuccessQuery),
+        getDocs(monthFailureQuery),
+        getDocs(monthLoginSuccessQuery),
+        getDocs(monthLoginFailureQuery),
+      ]);
+
+      monthlyData.push({
+        month: monthNames[month],
+        successCount: mSuccess.size,
+        failureCount: mFail.size,
+        loginSuccessCount: mLoginSuccess.size,
+        loginFailureCount: mLoginFail.size,
+        total: mTotal.size,
+      });
+    }
+
+    res.status(200).json({
+      success: true, totalLogs: totalCount,
+      yearlySummary: {
+        successCount,
+        failureCount,
+        loginSuccessCount,
+        loginFailureCount,
+      },
+      monthlyData,
+    });
+  } catch (error: Error | any) {
+    console.error("Error in getSuccessFailureActionlogCounts:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+
+export const getSuccessFailureActionlogCountsByPlatformAndYear = async (req: Request, res: Response) => {
+  const { platform, year } = req.params;
+  try {
+    const successQuery = query(actionLogsRef, where("status", "==", "Success"), where("platform", "==", platform), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+    const failureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("platform", "==", platform), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+
+    const loginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("platform", "==", platform), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+    const loginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("platform", "==", platform), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+    const allSnap = await getDocs(query(actionLogsRef,where("platform", "==", platform)));
+    const allDocs = allSnap.docs;
+    const successSnapshot = await getDocs(successQuery);
+    const failureSnapshot = await getDocs(failureQuery);
+    const loginSuccessSnapshot = await getDocs(loginSuccessQuery);
+    const loginFailureSnapshot = await getDocs(loginFailureQuery);
+    const successCount = successSnapshot.size;
+    const failureCount = failureSnapshot.size;
+    const loginSuccessCount = loginSuccessSnapshot.size;
+    const loginFailureCount = loginFailureSnapshot.size;
+    const totalCount = allDocs.length;
+    const monthlyData = [];
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+    for (let month = 0; month < 12; month++) {
+      const start = new Date(Date.UTC(Number(year), month, 1, 0, 0, 0));
+      const end = new Date(Date.UTC(Number(year), month + 1, 0, 23, 59, 59));
+      const monthTotalQuery = query(actionLogsRef, where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthSuccessQuery = query(actionLogsRef, where("status", "==", "Success"), where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthFailureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthLoginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthLoginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const [mTotal,mSuccess, mFail, mLoginSuccess, mLoginFail] = await Promise.all([
+        getDocs(monthTotalQuery),
+        getDocs(monthSuccessQuery),
+        getDocs(monthFailureQuery),
+        getDocs(monthLoginSuccessQuery),
+        getDocs(monthLoginFailureQuery),
+      ]); 
+      monthlyData.push({
+        month: monthNames[month],
+        successCount: mSuccess.size,
+        failureCount: mFail.size,
+        loginSuccessCount: mLoginSuccess.size,
+        loginFailureCount: mLoginFail.size,
+        totalCount: mTotal.size,
+      });
+    }
+    res.status(200).json({ success: true, totalLogs: totalCount, 
+      yearlySummary: { successCount, failureCount, loginSuccessCount, loginFailureCount  },
+      monthlyData
+     });
+  } catch (error: Error | any) {
+    console.error("Error in getSuccessFailureActionlogCounts:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+export const getSuccessFailureActionlogCountsByAllocationTypeAndYear = async (req: Request, res: Response) => {
+  const { allocation_type, year } = req.params;
+  try {
+    const successQuery = query(actionLogsRef, where("status", "==", "Success"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+    const failureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+
+    const loginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+    const loginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
+    const allSnap = await getDocs(query(actionLogsRef,where("Newspaper_allocation.allocation_type", "==", allocation_type)));
+    const allDocs = allSnap.docs;
+    const successSnapshot = await getDocs(successQuery);
+    const failureSnapshot = await getDocs(failureQuery);
+    const loginSuccessSnapshot = await getDocs(loginSuccessQuery);
+    const loginFailureSnapshot = await getDocs(loginFailureQuery);
+    const successCount = successSnapshot.size;
+    const failureCount = failureSnapshot.size;
+    const loginSuccessCount = loginSuccessSnapshot.size;
+    const loginFailureCount = loginFailureSnapshot.size;
+    const totalCount = allDocs.length;
+    const monthlyData = [];
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ];
+    for (let month = 0; month < 12; month++) {
+      const start = new Date(Date.UTC(Number(year), month, 1, 0, 0, 0));
+      const end = new Date(Date.UTC(Number(year), month + 1, 0, 23, 59, 59));
+      const monthTotalQuery = query(actionLogsRef, where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthSuccessQuery = query(actionLogsRef, where("status", "==", "Success"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthFailureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthLoginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const monthLoginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
+      const [mTotal,mSuccess, mFail, mLoginSuccess, mLoginFail] = await Promise.all([getDocs(monthTotalQuery), getDocs(monthSuccessQuery), getDocs(monthFailureQuery), getDocs(monthLoginSuccessQuery), getDocs(monthLoginFailureQuery)]);
+      const mTotalCount = mTotal.size;
+      const mSuccessCount = mSuccess.size;
+      const mFailureCount = mFail.size;
+      const mLoginSuccessCount = mLoginSuccess.size;
+      const mLoginFailureCount = mLoginFail.size;
+      monthlyData.push({
+        month: monthNames[month],
+        totalCount: mTotalCount,
+        successCount: mSuccessCount,
+        failureCount: mFailureCount,
+        loginSuccessCount: mLoginSuccessCount,
+        loginFailureCount: mLoginFailureCount,
+      });
+    }
+    res.status(200).json({ success: true, totalLogs: totalCount, 
+      yearlySummary: { successCount, failureCount, loginSuccessCount, loginFailureCount  },
+      monthlyData
+     });
+  } catch (error: Error | any) {
+    console.error("Error in getSuccessFailureActionlogCounts:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+
