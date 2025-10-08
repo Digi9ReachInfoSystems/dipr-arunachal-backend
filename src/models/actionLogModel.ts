@@ -5,11 +5,11 @@ export enum AllocationType {
   AUTOMATIC = "Automatic",
 }
 
-export enum PlatformType {
-  IOS = "iOS",
-  ANDROID = "Android",
-  WEB = "Web",
-}
+  export enum PlatformType {
+    IOS = "iOS",
+    ANDROID = "Android",
+    WEB = "Web",
+  }
 
 export interface NewspaperAllocation {
   Newspaper: DocumentReference[];
