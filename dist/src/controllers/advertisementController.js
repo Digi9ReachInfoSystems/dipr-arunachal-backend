@@ -1,4 +1,4 @@
-import { getFirestore, doc, getDoc, writeBatch, serverTimestamp, getDocs, collection, DocumentReference, addDoc, updateDoc, increment, runTransaction, } from "firebase/firestore";
+import { getFirestore, doc, getDoc, writeBatch, serverTimestamp, getDocs, collection, DocumentReference, addDoc, updateDoc, increment, runTransaction, query, where, } from "firebase/firestore";
 import moment from "moment-timezone";
 import db from "../configs/firebase.js";
 import Advertisement, {} from "../models/advertisementModel.js";
@@ -948,7 +948,7 @@ export const manualAllocationSendToNewspaper = async (req, res) => {
                 Newspaper_allocation: {
                     Newspaper: allotednewspapers,
                     allotedtime: new Date(),
-                    allocation_type: AllocationType.AUTOMATIC,
+                    allocation_type: AllocationType.MANUAL,
                     allotedby: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
                 },
                 actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -1427,7 +1427,7 @@ export const manualAllocationSendToDeputy = async (req, res) => {
                 Newspaper_allocation: {
                     Newspaper: allotednewspapers,
                     allotedtime: new Date(),
-                    allocation_type: AllocationType.AUTOMATIC,
+                    allocation_type: AllocationType.MANUAL,
                     allotedby: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
                 },
                 actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -1608,6 +1608,37 @@ export const generateAdvertisementReport = async (req, res) => {
     }
     catch (error) {
         console.error("❌ Error generating PDF:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+export const getAdvertisementCountByYear = async (req, res) => {
+    const { year } = req.params;
+    if (!year) {
+        return res.status(400).json({ success: false, message: "Year parameter is required" });
+    }
+    try {
+        const startDate = new Date(`${year}-01-01T00:00:00Z`);
+        const endDate = new Date(`${year}-12-31T23:59:59Z`);
+        const querySnapshot = await getDocs(query(collection(db, "Advertisement"), where("createdAt", ">=", Timestamp.fromDate(startDate)), where("createdAt", "<=", Timestamp.fromDate(endDate))));
+        const count = querySnapshot.size;
+        const monthNames = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ];
+        const monthQueries = monthNames.map((month, i) => {
+            const start = new Date(Date.UTC(Number(year), i, 1, 0, 0, 0));
+            const end = new Date(Date.UTC(Number(year), i + 1, 0, 23, 59, 59)); // handles variable month length automatically
+            return getDocs(query(collection(db, "Advertisement"), where("createdAt", ">=", Timestamp.fromDate(start)), where("createdAt", "<=", Timestamp.fromDate(end)))).then((snap) => ({
+                month,
+                count: snap.size,
+            }));
+        });
+        const monthlyData = await Promise.all(monthQueries);
+        // console.log(`Year ${year}: Total advertisements = ${count}`, monthlyData);
+        res.status(200).json({ success: true, year, count, monthlyData });
+    }
+    catch (error) {
+        console.error("❌ Error fetching advertisement count:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

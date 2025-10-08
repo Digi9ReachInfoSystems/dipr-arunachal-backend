@@ -43,8 +43,8 @@ import actionLogRoute from "./src/routes/actionLogRoute.js";
 import newsPaperJobAllocationRoute from "./src/routes/newsPaperJobAllocationRoutes.js";
 import dashboardRoute from "./src/routes/dashboardRoutes.js";
 import advertisementRoute from "./src/routes/advertisementRoute.js";
-
-
+import invoiceRequestRoute from "./src/routes/InvoiceRequestRoutes.js";
+import approvedAddRoute from "./src/routes/approved_addRoute.js";
 
 
 
@@ -54,6 +54,9 @@ app.use("/actionLogs", actionLogRoute);
 app.use("/newsPaperJobAllocation", newsPaperJobAllocationRoute);
 app.use("/dashboard", dashboardRoute);
 app.use("/advertisement", advertisementRoute);
+app.use("/invoiceRequest", invoiceRequestRoute);
+app.use("/approvedAdd", approvedAddRoute);
+
 
 
 

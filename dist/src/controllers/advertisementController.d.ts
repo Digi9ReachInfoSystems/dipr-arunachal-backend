@@ -10,4 +10,5 @@ export declare const manualAllocationSendToDeputy: (req: Request, res: Response)
  * Generate Advertisement PDF report for a given date range
  */
 export declare const generateAdvertisementReport: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+export declare const getAdvertisementCountByYear: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 //# sourceMappingURL=advertisementController.d.ts.map
