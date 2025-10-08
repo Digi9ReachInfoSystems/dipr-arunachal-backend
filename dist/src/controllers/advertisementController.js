@@ -99,11 +99,12 @@ export const createAdvertisement = async (req, res) => {
             actiontime: moment().tz("Asia/Kolkata").toDate(),
             adRef: docRef.id ? doc(db, "Advertisement", docRef.id) : null,
         });
-        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
         return res.status(201).json({
             success: true,
             id: docRef.id,
             data: payload,
+            actionLogId: actionLogRef.id,
         });
     }
     catch (error) {
