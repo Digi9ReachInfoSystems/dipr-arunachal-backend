@@ -241,20 +241,44 @@ export const getSuccessFailureActionlogCounts = async (req, res) => {
     try {
         const successQuery = query(actionLogsRef, where("status", "==", "Success"));
         const failureQuery = query(actionLogsRef, where("status", "==", "Failed"));
+        const loginLogsQuery = query(actionLogsRef, where("islogin", "==", true));
         const loginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"));
         const loginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"));
+        const actionLogsQuery = query(actionLogsRef, where("islogin", "==", false));
+        const actionlogsSuccessQuery = query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"));
+        const actionlogsFailureQuery = query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"));
         const allSnap = await getDocs(actionLogsRef);
         const allDocs = allSnap.docs;
+        const loginSnap = await getDocs(loginLogsQuery);
         const successSnapshot = await getDocs(successQuery);
         const failureSnapshot = await getDocs(failureQuery);
         const loginSuccessSnapshot = await getDocs(loginSuccessQuery);
         const loginFailureSnapshot = await getDocs(loginFailureQuery);
+        const actionlogsSnap = await getDocs(actionLogsQuery);
+        const actionlogsSuccessSnapshot = await getDocs(actionlogsSuccessQuery);
+        const actionlogsFailureSnapshot = await getDocs(actionlogsFailureQuery);
         const successCount = successSnapshot.size;
         const failureCount = failureSnapshot.size;
+        const loginCount = loginSnap.size;
         const loginSuccessCount = loginSuccessSnapshot.size;
         const loginFailureCount = loginFailureSnapshot.size;
         const totalCount = allDocs.length;
-        res.status(200).json({ success: true, totalLogs: totalCount, successCount, failureCount, loginSuccessCount, loginFailureCount, });
+        res.status(200).json({
+            success: true,
+            totalLogs: totalCount,
+            successCount,
+            failureCount,
+            loginLog: {
+                totalCount: loginCount,
+                successCount: loginSuccessCount,
+                failureCount: loginFailureCount
+            },
+            actionLog: {
+                totalCount: actionlogsSnap.size,
+                successCount: actionlogsSuccessSnapshot.size,
+                failureCount: actionlogsFailureSnapshot.size
+            }
+        });
     }
     catch (error) {
         console.error("Error in getSuccessFailureActionlogCounts:", error);
@@ -263,178 +287,277 @@ export const getSuccessFailureActionlogCounts = async (req, res) => {
 };
 export const getSuccessFailureActionlogCountsByYear = async (req, res) => {
     const { year } = req.params;
+    if (!year) {
+        return res.status(400).json({ success: false, message: "Year parameter is required" });
+    }
     try {
-        const successQuery = query(actionLogsRef, where("status", "==", "Success"), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const failureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const loginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const loginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const allSnap = await getDocs(actionLogsRef);
-        const allDocs = allSnap.docs;
-        const successSnapshot = await getDocs(successQuery);
-        const failureSnapshot = await getDocs(failureQuery);
-        const loginSuccessSnapshot = await getDocs(loginSuccessQuery);
-        const loginFailureSnapshot = await getDocs(loginFailureQuery);
-        const successCount = successSnapshot.size;
-        const failureCount = failureSnapshot.size;
-        const loginSuccessCount = loginSuccessSnapshot.size;
-        const loginFailureCount = loginFailureSnapshot.size;
-        const totalCount = allDocs.length;
-        const monthlyData = [];
+        const startOfYear = new Date(`${year}-01-01T00:00:00Z`);
+        const endOfYear = new Date(`${year}-12-31T23:59:59.999Z`);
+        // === Yearly queries ===
+        const baseWhere = [
+            where("actiontime", ">=", startOfYear),
+            where("actiontime", "<=", endOfYear),
+        ];
+        const [allSnap, successSnap, failureSnap, loginSnap, loginSuccessSnap, loginFailureSnap, actionSnap, actionSuccessSnap, actionFailureSnap,] = await Promise.all([
+            getDocs(actionLogsRef),
+            getDocs(query(actionLogsRef, where("status", "==", "Success"), ...baseWhere)),
+            getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...baseWhere)),
+            getDocs(query(actionLogsRef, where("islogin", "==", true), ...baseWhere)),
+            getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...baseWhere)),
+            getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...baseWhere)),
+            getDocs(query(actionLogsRef, where("islogin", "==", false), ...baseWhere)),
+            getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...baseWhere)),
+            getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...baseWhere)),
+        ]);
+        const yearlySummary = {
+            totalLogs: allSnap.size,
+            successCount: successSnap.size,
+            failureCount: failureSnap.size,
+            loginLog: {
+                totalCount: loginSnap.size,
+                successCount: loginSuccessSnap.size,
+                failureCount: loginFailureSnap.size,
+            },
+            actionLog: {
+                totalCount: actionSnap.size,
+                successCount: actionSuccessSnap.size,
+                failureCount: actionFailureSnap.size,
+            },
+        };
+        // === Monthly breakdown ===
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December",
         ];
-        for (let month = 0; month < 12; month++) {
-            const start = new Date(Date.UTC(Number(year), month, 1, 0, 0, 0));
-            const end = new Date(Date.UTC(Number(year), month + 1, 0, 23, 59, 59));
-            const monthTotalQuery = query(actionLogsRef, where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthSuccessQuery = query(actionLogsRef, where("status", "==", "Success"), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthFailureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthLoginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthLoginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const [mTotal, mSuccess, mFail, mLoginSuccess, mLoginFail] = await Promise.all([
-                getDocs(monthTotalQuery),
-                getDocs(monthSuccessQuery),
-                getDocs(monthFailureQuery),
-                getDocs(monthLoginSuccessQuery),
-                getDocs(monthLoginFailureQuery),
-            ]);
-            monthlyData.push({
-                month: monthNames[month],
-                successCount: mSuccess.size,
-                failureCount: mFail.size,
-                loginSuccessCount: mLoginSuccess.size,
-                loginFailureCount: mLoginFail.size,
-                total: mTotal.size,
-            });
-        }
-        res.status(200).json({
-            success: true, totalLogs: totalCount,
-            yearlySummary: {
-                successCount,
-                failureCount,
-                loginSuccessCount,
-                loginFailureCount,
-            },
+        const monthlyPromises = monthNames.map((month, i) => {
+            const start = new Date(Date.UTC(Number(year), i, 1, 0, 0, 0));
+            const end = new Date(Date.UTC(Number(year), i + 1, 0, 23, 59, 59));
+            const commonWhere = [where("actiontime", ">=", start), where("actiontime", "<=", end)];
+            return Promise.all([
+                getDocs(query(actionLogsRef, ...commonWhere)), // total
+                getDocs(query(actionLogsRef, where("status", "==", "Success"), ...commonWhere)),
+                getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...commonWhere)),
+                getDocs(query(actionLogsRef, where("islogin", "==", true), ...commonWhere)), // login total
+                getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...commonWhere)),
+                getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...commonWhere)),
+                getDocs(query(actionLogsRef, where("islogin", "==", false), ...commonWhere)), // action total
+                getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...commonWhere)),
+                getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...commonWhere)),
+            ]).then(([total, success, failed, loginTotal, loginSuccess, loginFailed, actionTotal, actionSuccess, actionFailed,]) => ({
+                month,
+                total: total.size,
+                successCount: success.size,
+                failureCount: failed.size,
+                loginLog: {
+                    totalCount: loginTotal.size,
+                    successCount: loginSuccess.size,
+                    failureCount: loginFailed.size,
+                },
+                actionLog: {
+                    totalCount: actionTotal.size,
+                    successCount: actionSuccess.size,
+                    failureCount: actionFailed.size,
+                },
+            }));
+        });
+        const monthlyData = await Promise.all(monthlyPromises);
+        // === Response ===
+        return res.status(200).json({
+            success: true,
+            year,
+            ...yearlySummary,
             monthlyData,
         });
     }
     catch (error) {
-        console.error("Error in getSuccessFailureActionlogCounts:", error);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
+        console.error("❌ Error in getSuccessFailureActionlogCountsByYear:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal Server Error",
+            error: error.message,
+        });
     }
 };
 export const getSuccessFailureActionlogCountsByPlatformAndYear = async (req, res) => {
-    const { platform, year } = req.params;
+    const { year } = req.params;
+    if (!year) {
+        return res.status(400).json({
+            success: false,
+            message: "Year parameter is required",
+        });
+    }
     try {
-        const successQuery = query(actionLogsRef, where("status", "==", "Success"), where("platform", "==", platform), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const failureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("platform", "==", platform), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const loginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("platform", "==", platform), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const loginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("platform", "==", platform), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const allSnap = await getDocs(query(actionLogsRef, where("platform", "==", platform)));
-        const allDocs = allSnap.docs;
-        const successSnapshot = await getDocs(successQuery);
-        const failureSnapshot = await getDocs(failureQuery);
-        const loginSuccessSnapshot = await getDocs(loginSuccessQuery);
-        const loginFailureSnapshot = await getDocs(loginFailureQuery);
-        const successCount = successSnapshot.size;
-        const failureCount = failureSnapshot.size;
-        const loginSuccessCount = loginSuccessSnapshot.size;
-        const loginFailureCount = loginFailureSnapshot.size;
-        const totalCount = allDocs.length;
-        const monthlyData = [];
+        const platforms = ["iOS", "Android", "Web"];
+        const startOfYear = new Date(`${year}-01-01T00:00:00Z`);
+        const endOfYear = new Date(`${year}-12-31T23:59:59.999Z`);
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December",
         ];
-        for (let month = 0; month < 12; month++) {
-            const start = new Date(Date.UTC(Number(year), month, 1, 0, 0, 0));
-            const end = new Date(Date.UTC(Number(year), month + 1, 0, 23, 59, 59));
-            const monthTotalQuery = query(actionLogsRef, where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthSuccessQuery = query(actionLogsRef, where("status", "==", "Success"), where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthFailureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthLoginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthLoginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("platform", "==", platform), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const [mTotal, mSuccess, mFail, mLoginSuccess, mLoginFail] = await Promise.all([
-                getDocs(monthTotalQuery),
-                getDocs(monthSuccessQuery),
-                getDocs(monthFailureQuery),
-                getDocs(monthLoginSuccessQuery),
-                getDocs(monthLoginFailureQuery),
+        // 🔹 Loop through all 3 platforms
+        const results = await Promise.all(platforms.map(async (platform) => {
+            // === Yearly summary ===
+            const baseFilters = [
+                where("platform", "==", platform),
+                where("actiontime", ">=", startOfYear),
+                where("actiontime", "<=", endOfYear),
+            ];
+            const [allSnap, successSnap, failureSnap, loginSnap, loginSuccessSnap, loginFailureSnap, actionSnap, actionSuccessSnap, actionFailureSnap,] = await Promise.all([
+                getDocs(query(actionLogsRef, ...baseFilters)),
+                getDocs(query(actionLogsRef, where("status", "==", "Success"), ...baseFilters)),
+                getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...baseFilters)),
+                getDocs(query(actionLogsRef, where("islogin", "==", true), ...baseFilters)),
+                getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...baseFilters)),
+                getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...baseFilters)),
+                getDocs(query(actionLogsRef, where("islogin", "==", false), ...baseFilters)),
+                getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...baseFilters)),
+                getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...baseFilters)),
             ]);
-            monthlyData.push({
-                month: monthNames[month],
-                successCount: mSuccess.size,
-                failureCount: mFail.size,
-                loginSuccessCount: mLoginSuccess.size,
-                loginFailureCount: mLoginFail.size,
-                totalCount: mTotal.size,
+            const yearlySummary = {
+                platform,
+                totalLogs: allSnap.size,
+                successCount: successSnap.size,
+                failureCount: failureSnap.size,
+                loginLog: {
+                    totalCount: loginSnap.size,
+                    successCount: loginSuccessSnap.size,
+                    failureCount: loginFailureSnap.size,
+                },
+                actionLog: {
+                    totalCount: actionSnap.size,
+                    successCount: actionSuccessSnap.size,
+                    failureCount: actionFailureSnap.size,
+                },
+            };
+            // === Monthly summary ===
+            const monthlyPromises = monthNames.map(async (month, i) => {
+                const start = new Date(Date.UTC(Number(year), i, 1, 0, 0, 0));
+                const end = new Date(Date.UTC(Number(year), i + 1, 0, 23, 59, 59));
+                const monthFilter = [
+                    where("platform", "==", platform),
+                    where("actiontime", ">=", start),
+                    where("actiontime", "<=", end),
+                ];
+                const [totalSnap, successSnap, failSnap, loginTotalSnap, loginSuccessSnap, loginFailSnap, actionTotalSnap, actionSuccessSnap, actionFailSnap,] = await Promise.all([
+                    getDocs(query(actionLogsRef, ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("status", "==", "Success"), ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("islogin", "==", true), ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("islogin", "==", false), ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...monthFilter)),
+                ]);
+                return {
+                    month,
+                    totalCount: totalSnap.size,
+                    successCount: successSnap.size,
+                    failureCount: failSnap.size,
+                    loginLog: {
+                        totalCount: loginTotalSnap.size,
+                        successCount: loginSuccessSnap.size,
+                        failureCount: loginFailSnap.size,
+                    },
+                    actionLog: {
+                        totalCount: actionTotalSnap.size,
+                        successCount: actionSuccessSnap.size,
+                        failureCount: actionFailSnap.size,
+                    },
+                };
             });
-        }
-        res.status(200).json({ success: true, totalLogs: totalCount,
-            yearlySummary: { successCount, failureCount, loginSuccessCount, loginFailureCount },
-            monthlyData
+            const monthlyData = await Promise.all(monthlyPromises);
+            return { platform, yearlySummary, monthlyData };
+        }));
+        // ✅ Final Response
+        return res.status(200).json({
+            success: true,
+            year,
+            data: results,
         });
     }
     catch (error) {
-        console.error("Error in getSuccessFailureActionlogCounts:", error);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
+        console.error("❌ Error in getSuccessFailureActionlogCountsByPlatformAndYear:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal Server Error",
+            error: error.message,
+        });
     }
 };
 export const getSuccessFailureActionlogCountsByAllocationTypeAndYear = async (req, res) => {
-    const { allocation_type, year } = req.params;
+    const { year } = req.params;
+    if (!year) {
+        return res.status(400).json({
+            success: false,
+            message: "Year parameter is required",
+        });
+    }
     try {
-        const successQuery = query(actionLogsRef, where("status", "==", "Success"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const failureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const loginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const loginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", new Date(`${year}-01-01T00:00:00Z`)), where("actiontime", "<=", new Date(`${year}-12-31T23:59:59.999Z`)));
-        const allSnap = await getDocs(query(actionLogsRef, where("Newspaper_allocation.allocation_type", "==", allocation_type)));
-        const allDocs = allSnap.docs;
-        const successSnapshot = await getDocs(successQuery);
-        const failureSnapshot = await getDocs(failureQuery);
-        const loginSuccessSnapshot = await getDocs(loginSuccessQuery);
-        const loginFailureSnapshot = await getDocs(loginFailureQuery);
-        const successCount = successSnapshot.size;
-        const failureCount = failureSnapshot.size;
-        const loginSuccessCount = loginSuccessSnapshot.size;
-        const loginFailureCount = loginFailureSnapshot.size;
-        const totalCount = allDocs.length;
-        const monthlyData = [];
+        const allocationTypes = ["Manual", "Automatic"];
+        const startOfYear = new Date(`${year}-01-01T00:00:00Z`);
+        const endOfYear = new Date(`${year}-12-31T23:59:59.999Z`);
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December",
         ];
-        for (let month = 0; month < 12; month++) {
-            const start = new Date(Date.UTC(Number(year), month, 1, 0, 0, 0));
-            const end = new Date(Date.UTC(Number(year), month + 1, 0, 23, 59, 59));
-            const monthTotalQuery = query(actionLogsRef, where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthSuccessQuery = query(actionLogsRef, where("status", "==", "Success"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthFailureQuery = query(actionLogsRef, where("status", "==", "Failed"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthLoginSuccessQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const monthLoginFailureQuery = query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), where("Newspaper_allocation.allocation_type", "==", allocation_type), where("actiontime", ">=", start), where("actiontime", "<=", end));
-            const [mTotal, mSuccess, mFail, mLoginSuccess, mLoginFail] = await Promise.all([getDocs(monthTotalQuery), getDocs(monthSuccessQuery), getDocs(monthFailureQuery), getDocs(monthLoginSuccessQuery), getDocs(monthLoginFailureQuery)]);
-            const mTotalCount = mTotal.size;
-            const mSuccessCount = mSuccess.size;
-            const mFailureCount = mFail.size;
-            const mLoginSuccessCount = mLoginSuccess.size;
-            const mLoginFailureCount = mLoginFail.size;
-            monthlyData.push({
-                month: monthNames[month],
-                totalCount: mTotalCount,
-                successCount: mSuccessCount,
-                failureCount: mFailureCount,
-                loginSuccessCount: mLoginSuccessCount,
-                loginFailureCount: mLoginFailureCount,
+        // 🔹 Loop through both allocation types
+        const results = await Promise.all(allocationTypes.map(async (allocation_type) => {
+            // === Yearly summary ===
+            const baseFilters = [
+                where("Newspaper_allocation.allocation_type", "==", allocation_type),
+                where("actiontime", ">=", startOfYear),
+                where("actiontime", "<=", endOfYear),
+            ];
+            const [allSnap, successSnap, failureSnap,] = await Promise.all([
+                getDocs(query(actionLogsRef, ...baseFilters)),
+                getDocs(query(actionLogsRef, where("status", "==", "Success"), ...baseFilters)),
+                getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...baseFilters)),
+            ]);
+            const yearlySummary = {
+                allocation_type,
+                totalLogs: allSnap.size,
+                successCount: successSnap.size,
+                failureCount: failureSnap.size,
+            };
+            // === Monthly summary ===
+            const monthlyPromises = monthNames.map(async (month, i) => {
+                const start = new Date(Date.UTC(Number(year), i, 1, 0, 0, 0));
+                const end = new Date(Date.UTC(Number(year), i + 1, 0, 23, 59, 59));
+                const monthFilter = [
+                    where("Newspaper_allocation.allocation_type", "==", allocation_type),
+                    where("actiontime", ">=", start),
+                    where("actiontime", "<=", end),
+                ];
+                const [totalSnap, successSnap, failSnap] = await Promise.all([
+                    getDocs(query(actionLogsRef, ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("status", "==", "Success"), ...monthFilter)),
+                    getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...monthFilter)),
+                ]);
+                return {
+                    month,
+                    totalCount: totalSnap.size,
+                    successCount: successSnap.size,
+                    failureCount: failSnap.size,
+                };
             });
-        }
-        res.status(200).json({ success: true, totalLogs: totalCount,
-            yearlySummary: { successCount, failureCount, loginSuccessCount, loginFailureCount },
-            monthlyData
+            const monthlyData = await Promise.all(monthlyPromises);
+            return { allocation_type, yearlySummary, monthlyData };
+        }));
+        // ✅ Final Response
+        return res.status(200).json({
+            success: true,
+            year,
+            data: results,
         });
     }
     catch (error) {
-        console.error("Error in getSuccessFailureActionlogCounts:", error);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
+        console.error("❌ Error in getSuccessFailureActionlogCountsByAllocationTypeAndYear:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal Server Error",
+            error: error.message,
+        });
     }
 };
 //# sourceMappingURL=actionLogController.js.map

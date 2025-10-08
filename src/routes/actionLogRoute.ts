@@ -18,6 +18,6 @@ router.get("/byId/:id", getActionLogById);
 router.delete("/byId/:id", deleteActionLog);
 router.get("/stats/success-failure/count", getSuccessFailureActionlogCounts);
 router.get("/stats/success-failure/count/year/:year", getSuccessFailureActionlogCountsByYear);
-router.get("/stats/success-failure/count/byPlatform/:platform/year/:year", getSuccessFailureActionlogCountsByPlatformAndYear);
-router.get("/stats/success-failure/count/byAllocationType/:allocation_type/year/:year", getSuccessFailureActionlogCountsByAllocationTypeAndYear);
+router.get("/stats/success-failure/count/byPlatform/year/:year", getSuccessFailureActionlogCountsByPlatformAndYear);
+router.get("/stats/success-failure/count/byAllocationType/year/:year", getSuccessFailureActionlogCountsByAllocationTypeAndYear);
 export default router;
