@@ -738,7 +738,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
         message: "Automatic allocation successful sent to newspapers",
         status: "Success",
         platform: platform,
-        networkip,
+        networkip:req.ip||null,
         screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers as unknown as DocumentReference<DocumentData>[],
