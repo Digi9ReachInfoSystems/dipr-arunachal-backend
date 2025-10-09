@@ -1,6 +1,8 @@
-import { getFirestore, doc, getDoc, writeBatch, serverTimestamp, getDocs, collection, DocumentReference, Timestamp, query, where } from "firebase/firestore";
+import { getFirestore, doc, getDoc, writeBatch, serverTimestamp, getDocs, collection, DocumentReference, Timestamp, query, where, updateDoc, addDoc, increment, setDoc } from "firebase/firestore";
 import moment from "moment-timezone";
 import db from "../configs/firebase.js";
+import ActionLog, { AllocationType } from "../models/actionLogModel.js";
+import { ro } from "date-fns/locale";
 export const updateApproveCvAndTimeAllotment = async (req, res) => {
     try {
         const { documentIds, addressTo, to, advertisementNumber } = req.body;
@@ -267,6 +269,550 @@ export const getNewspaperJobAllocationsCountByUser = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Failed to fetch counts",
+            error: error.message,
+        });
+    }
+};
+export const approveNewspaperJobAllocationByVendor = async (req, res) => {
+    const { JobApplicationId, user_ref, user_role, platform, screen } = req.body;
+    if (!JobApplicationId) {
+        return res.status(400).json({
+            success: false,
+            message: "ID parameter is required",
+        });
+    }
+    const docRef = doc(db, "NewspaperJobAllocation", JobApplicationId);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "NewspaperJobAllocation not found",
+        });
+    }
+    const data = docSnap.data();
+    try {
+        if (!data) {
+            return res.status(404).json({
+                success: false,
+                message: "NewspaperJobAllocation not found",
+            });
+        }
+        //  Step 1 — Update NewspaperJobAllocation document
+        await updateDoc(docRef, {
+            acknowledgedboolean: true,
+            acknowledgementtime: serverTimestamp(),
+            completed: true
+        });
+        //create actionLogs
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+            islogin: false,
+            rodocref: docRef,
+            ronumber: data.roNumber,
+            old_data: data,
+            edited_data: {
+                ...data,
+                acknowledgedboolean: true,
+                acknowledgementtime: serverTimestamp(),
+                completed: true
+            },
+            user_role,
+            action: 8,
+            message: "Approved Newspaper Job Allocation ",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: data.adref,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        //  Step 2 — Update Advertisement document
+        // const adDocRef = doc(db, "Advertisements", data.adref);
+        const adDocSnap = await getDoc(data.adref);
+        if (!adDocSnap.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Advertisement not found",
+            });
+        }
+        const adData = adDocSnap.data();
+        if (!adData) {
+            return res.status(404).json({
+                success: false,
+                message: "Advertisement not found",
+            });
+        }
+        let approvednewspaperslocal = adData?.approvednewspaperslocal || [];
+        approvednewspaperslocal.push(doc(db, "Users", req.body.user_ref));
+        // remove duplicates safely
+        const uniqueByPath = new Map();
+        approvednewspaperslocal.forEach(ref => {
+            const path = typeof ref === "string" ? ref : ref.path;
+            uniqueByPath.set(path, ref);
+        });
+        approvednewspaperslocal = Array.from(uniqueByPath.values());
+        await updateDoc(data.adref, {
+            Status_Vendor: 1,
+            approvednewspaperslocal: approvednewspaperslocal,
+        });
+        //mail functionality
+        const userRef = doc(db, "Users", req.body.user_ref);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.data();
+        if (!userData) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        const toMail = usersEmailData["technicalassistantadvtgmailcom"];
+        try {
+            const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
+                    roNumber: data.roNumber,
+                    vendorName: userData.display_name,
+                    vendorContact: userData.email,
+                    result: "accepted",
+                    resultComment: " All necessary checks have been completed, and the order is now ready for billing.",
+                    addressTo: "ADVT Cell"
+                }),
+            });
+            console.log("Mail sent successfully:", res);
+        }
+        catch (error) {
+            console.error("❌ Error in sending mail:", error);
+            return res.status(500).json({
+                success: false,
+                message: "Failed to send mail",
+                error: error.message,
+            });
+        }
+        try {
+            const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/VendorStausDept`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: adData.Bearingno,
+                    // to: "jayanthbr@digi9.co.in",
+                    roNumber: data.roNumber,
+                    vendorName: userData.display_name,
+                    vendorContact: userData.email,
+                }),
+            });
+            console.log("Mail sent successfully:", res);
+        }
+        catch (error) {
+            console.error("❌ Error in sending mail:", error);
+            return res.status(500).json({
+                success: false,
+                message: "Failed to send mail",
+                error: error.message,
+            });
+        }
+        res.status(200).json({ success: true, message: "NewspaperJobAllocation approved successfully" });
+    }
+    catch (error) {
+        console.error("❌ Error in approveNewspaperJobAllocationByVendor:", error);
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+            islogin: false,
+            rodocref: docRef,
+            ronumber: data.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 8,
+            message: "Failed to approve Newspaper Job Allocation by Vendor",
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: data.adref,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        return res.status(500).json({
+            success: false,
+            message: "Failed to approve NewspaperJobAllocation",
+            error: error.message,
+        });
+    }
+};
+export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
+    const { JobApplicationId, rejectReason, user_ref, user_role, platform, screen } = req.body;
+    if (!JobApplicationId) {
+        return res.status(400).json({
+            success: false,
+            message: "ID parameter is required",
+        });
+    }
+    const docRef = doc(db, "NewspaperJobAllocation", JobApplicationId);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "NewspaperJobAllocation not found",
+        });
+    }
+    const data = docSnap.data();
+    try {
+        updateDoc(docRef, {
+            reasonRejection: rejectReason,
+            acknowledgementtime: serverTimestamp(),
+            completed: true,
+            aprovedcw: false,
+        });
+        const adDocSnap = await getDoc(data.adref);
+        if (!adDocSnap.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Advertisement not found",
+            });
+        }
+        const adData = adDocSnap.data();
+        if (!adData) {
+            return res.status(404).json({
+                success: false,
+                message: "Advertisement not found",
+            });
+        }
+        let Rejectednewspapers = adData?.Rejectednewspapers || [];
+        Rejectednewspapers.push(doc(db, "Users", req.body.user_ref));
+        // remove duplicates safely
+        const uniqueByPath = new Map();
+        Rejectednewspapers.forEach((ref) => {
+            const path = typeof ref === "string" ? ref : ref.path;
+            uniqueByPath.set(path, ref);
+        });
+        Rejectednewspapers = Array.from(uniqueByPath.values());
+        let allotednewspapers = adData?.allotednewspapers || [];
+        allotednewspapers = allotednewspapers.filter((ref) => {
+            const path = typeof ref === "string" ? ref : ref.path;
+            return !Rejectednewspapers.some((rejectedRef) => {
+                const rejectedPath = typeof rejectedRef === "string" ? rejectedRef : rejectedRef.path;
+                return path === rejectedPath;
+            });
+        });
+        await updateDoc(data.adref, {
+            Status_Vendor: 1,
+            Rejectednewspapers: Rejectednewspapers,
+            allotednewspapers: allotednewspapers,
+            reasonOfRejection: rejectReason,
+            IsrequesPending: false,
+            isDarft: false,
+            DateOfRejection: serverTimestamp(),
+        });
+        const userRef = doc(db, "Users", req.body.user_ref);
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.data() || {};
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        const toMail = usersEmailData["technicalassistantadvtgmailcom"];
+        const toMailTwo = usersEmailData["ddipradvtgmailcom"];
+        if (data.manuallyallotted == true) {
+            try {
+                const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        to: toMail,
+                        // to: "jayanthbr@digi9.co.in",
+                        roNumber: data.roNumber,
+                        vendorName: userData.display_name,
+                        vendorContact: userData.email,
+                        result: "rejected (manually allocated)",
+                        resultComment: "Please review the feedback provided.",
+                        addressTo: "ADVT Cell"
+                    }),
+                });
+                console.log("Mail sent successfully:", res);
+            }
+            catch (error) {
+                console.error("❌ Error in sending mail:", error);
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to send mail",
+                    error: error.message,
+                });
+            }
+            try {
+                const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        to: toMailTwo,
+                        // to: "jayanthbr@digi9.co.in",
+                        roNumber: data.roNumber,
+                        vendorName: userData.display_name,
+                        vendorContact: userData.email,
+                        result: "rejected (manually allocated)",
+                        resultComment: "Please review the feedback provided.",
+                        addressTo: "ADVT Cell"
+                    }),
+                });
+                console.log("Mail sent successfully:", res);
+            }
+            catch (error) {
+                console.error("❌ Error in sending mail:", error);
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to send mail",
+                    error: error.message,
+                });
+            }
+        }
+        else {
+            let logStatus = "success";
+            let logMessage = "Automatic allocation completed successfully.";
+            let oldData = {};
+            let editedData = {};
+            // 🔹 Calculate due time (7 PM IST today)
+            const istOffsetMs = 5.5 * 60 * 60 * 1000;
+            const now = new Date();
+            const nowIST = new Date(now.getTime() + istOffsetMs);
+            const dueIST = new Date(nowIST.getFullYear(), nowIST.getMonth(), nowIST.getDate(), 19, 0, 0, 0);
+            const dueUTC = new Date(dueIST.getTime());
+            const networkip = req.ip || null;
+            const adRef = data.adref;
+            const adSnap = await getDoc(adRef);
+            if (!adSnap.exists())
+                throw new Error("Advertisement not found");
+            oldData = adSnap.data();
+            const jobLogicSnap = await getDocs(collection(db, "joblogic"));
+            if (jobLogicSnap.empty)
+                throw new Error("Joblogic not found");
+            const joblogicDoc = jobLogicSnap.docs[0];
+            if (!joblogicDoc)
+                throw new Error("Joblogic document not found");
+            const joblogicRef = doc(db, "joblogic", joblogicDoc.id);
+            const jobLogicData = joblogicDoc.data();
+            const ronumbers = jobLogicData.ronumbers || 0;
+            const newspapers = jobLogicData.waitingquuelist || [];
+            let newNewsPaperRef = null;
+            newNewsPaperRef = newspapers[0];
+            const newNewsPaperSnap = await getDoc(newNewsPaperRef);
+            if (!newNewsPaperSnap.exists())
+                throw new Error("NewsPaper not found");
+            const newNewsPaperData = newNewsPaperSnap.data();
+            const newNewsPaper = newNewsPaperData || null;
+            let newAllotedNewsPaper = oldData.allotednewspapers;
+            newAllotedNewsPaper.push(newNewsPaperRef);
+            //update Advertisement
+            await updateDoc(adRef, {
+                allotednewspapers: newAllotedNewsPaper,
+            });
+            //create New newsPaperJobAllocation
+            const allocationPayload = {
+                timeofallotment: serverTimestamp(),
+                acknowledgedboolean: false,
+                newspaperrefuserref: newNewsPaperRef,
+                adref: adRef,
+                completed: false,
+                aprovedcw: true,
+                invoiceraised: false,
+                duetime: dueUTC,
+                ronumber: `DIPR/ARN/${ronumbers}`,
+                createdAt: serverTimestamp(),
+            };
+            //create New newsPaperJobAllocation
+            // const newNewsPaperJobAllocationRef = doc(collection(db, "newsPaperJobAllocation"));
+            const newNewsPaperJobAllocationRef = await addDoc(collection(db, "NewspaperJobAllocation"), allocationPayload);
+            // await setDoc(newNewsPaperJobAllocationRef, allocationPayload);
+            // await newDocRef.set(allocationPayload);
+            //create action Log
+            const actionLog = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: newNewsPaperJobAllocationRef, // each allocation doc ref
+                ronumber: allocationPayload.ronumber,
+                old_data: {},
+                edited_data: {},
+                user_role,
+                action: 3,
+                message: "Automatic allocation successful sent to newspapers",
+                status: "Success",
+                platform: platform,
+                networkip: req.ip || null,
+                screen,
+                Newspaper_allocation: {
+                    Newspaper: newAllotedNewsPaper,
+                    allotedtime: new Date(),
+                    allocation_type: AllocationType.AUTOMATIC,
+                    allotedby: user_ref ? doc(db, "Users", user_ref) : null,
+                },
+                adRef: data.adref,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+            });
+            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            //update jobLogic collection and increment ronumbers
+            const updatedQueue = [
+                ...newspapers.slice(1),
+                newNewsPaperRef
+            ];
+            await updateDoc(joblogicRef, {
+                waitingquuelist: updatedQueue,
+                ronumbers: increment(1),
+                updatedAt: serverTimestamp(),
+            });
+            //sending mail
+            // to vendor
+            try {
+                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        to: newNewsPaper.email,
+                        roNumber: `DIPR/ARN/${ronumbers}`,
+                        addressTo: "Technical Assistant",
+                    }),
+                });
+                console.log(`Email sent to ${newNewsPaper.email}`, response);
+            }
+            catch (err) {
+                console.error(`Failed to send email to ${newNewsPaper.email}:`, err.message);
+            }
+            //reject Mails
+            try {
+                const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        to: toMail,
+                        // to: "jayanthbr@digi9.co.in",
+                        roNumber: data.roNumber,
+                        vendorName: userData.display_name,
+                        vendorContact: userData.email,
+                        result: "rejected (manually allocated)",
+                        resultComment: "Please review the feedback provided.",
+                        addressTo: "ADVT Cell"
+                    }),
+                });
+                console.log("Mail sent successfully:", res);
+            }
+            catch (error) {
+                console.error("❌ Error in sending mail:", error);
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to send mail",
+                    error: error.message,
+                });
+            }
+            try {
+                const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        to: toMailTwo,
+                        // to: "jayanthbr@digi9.co.in",
+                        roNumber: data.roNumber,
+                        vendorName: userData.display_name,
+                        vendorContact: userData.email,
+                        result: "rejected (manually allocated)",
+                        resultComment: "Please review the feedback provided.",
+                        addressTo: "ADVT Cell"
+                    }),
+                });
+                console.log("Mail sent successfully:", res);
+            }
+            catch (error) {
+                console.error("❌ Error in sending mail:", error);
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to send mail",
+                    error: error.message,
+                });
+            }
+        }
+        //  create action logs
+        const newDataSnap = await getDoc(docRef);
+        const newData = newDataSnap.data();
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+            islogin: false,
+            rodocref: docRef,
+            ronumber: data.roNumber,
+            old_data: data,
+            edited_data: newData || {},
+            user_role,
+            action: 9,
+            message: `NewspaperJobAllocation rejected successfully by vendor`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: data.adref,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        res.status(200).json({
+            success: true,
+            message: "NewspaperJobAllocation rejected successfully",
+        });
+    }
+    catch (error) {
+        console.error("❌ Error in rejectNewspaperJobAllocationByVendor:", error);
+        // create action logs
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+            islogin: false,
+            rodocref: docRef,
+            ronumber: data.roNumber,
+            old_data: data,
+            edited_data: {},
+            user_role,
+            action: 9,
+            message: `NewspaperJobAllocation rejected failed by vendor ${error}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: data.adref,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        return res.status(500).json({
+            success: false,
+            message: "Failed to reject NewspaperJobAllocation",
             error: error.message,
         });
     }
