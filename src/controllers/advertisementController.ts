@@ -245,6 +245,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       "Bill_to",
       "Edition",
       "ListofPdf",
+      "Body",
     ];
     directFields.forEach((field) => {
       if (req.body[field] !== undefined) updatePayload[field] = req.body[field];
@@ -318,6 +319,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       success: true,
       message: "Advertisement updated successfully",
       id,
+      path: `Advertisement/${id}`,
       data: updatePayload,
     });
   } catch (error) {

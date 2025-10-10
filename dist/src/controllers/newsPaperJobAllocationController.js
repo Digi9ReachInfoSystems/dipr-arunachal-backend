@@ -2,7 +2,6 @@ import { getFirestore, doc, getDoc, writeBatch, serverTimestamp, getDocs, collec
 import moment from "moment-timezone";
 import db from "../configs/firebase.js";
 import ActionLog, { AllocationType } from "../models/actionLogModel.js";
-import { ro } from "date-fns/locale";
 export const updateApproveCvAndTimeAllotment = async (req, res) => {
     try {
         const { documentIds, addressTo, to, advertisementNumber } = req.body;
