@@ -33,12 +33,14 @@ interface UserNotification {
   to: string;
   roNumber: string;
   addressTo: string;
+  allocationRef: DocumentReference
 }
 
 interface VendorNotification {
   roNumber: string;
   result: string;
   resultComment: string;
+   allocationRef: DocumentReference;
 }
 export const createAdvertisement = async (req: Request, res: Response) => {
   try {
@@ -248,7 +250,13 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       "Body",
     ];
     directFields.forEach((field) => {
-      if (req.body[field] !== undefined) updatePayload[field] = req.body[field];
+      if (req.body[field] !== 'null') {
+        if (Array.isArray(req.body[field]) && req.body[field]?.length > 0) {
+          updatePayload[field] = req.body[field];
+        } else if (typeof req.body[field] === 'string'&&(req.body[field] !== 'null')) {
+          updatePayload[field] = req.body[field];
+        }
+      }
     });
 
     // 🔹 Boolean flags
@@ -276,7 +284,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       "Status_Vendor",
     ];
     integerFields.forEach((field) => {
-      if (req.body[field] !== undefined)
+      if (req.body[field] !== 100)
         updatePayload[field] = Number(req.body[field]);
     });
 
@@ -286,6 +294,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
     // 🔹 Perform Firestore update
     const docRef = doc(collection(db, "Advertisement"), id);
     const oldData = (await getDoc(docRef)).data() || {};
+    console.log("oldData", oldData);
     await updateDoc(docRef, updatePayload);
     const newData = (await getDoc(docRef)).data() || {};
 
@@ -664,6 +673,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
               // to: "jayanthbr@digi9.co.in",
               roNumber: `DIPR/ARN/${ronumbers + i}`,
               addressTo: "Technical Assistant",
+              allocationRef: allocationRef,
             });
             if (userData.display_name) {
               newsPaperList.push(userData.display_name);
@@ -694,6 +704,58 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(mail),
         });
+        if (response.status == 200) {
+          //create action log for mail sent
+          const actionLog = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: mail.allocationRef, // each allocation doc ref
+            ronumber: mail.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 10,
+            message: `Automatic Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${mail.to}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen,
+            Newspaper_allocation: {
+              Newspaper: [],
+              allotedtime: null,
+              allocation_type: null,
+              allotedby: null,
+            },
+            adRef: adRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+          });
+          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        } else {
+          const actionLog = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: mail.allocationRef, // each allocation doc ref
+            ronumber: mail.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 10,
+            message: `Automatic Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} `,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen,
+            Newspaper_allocation: {
+              Newspaper: [],
+              allotedtime: null,
+              allocation_type: null,
+              allotedby: null,
+            },
+            adRef: adRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+          });
+          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        }
         console.log(`Email sent to ${mail.to}`, response);
       } catch (err: any) {
         console.error(`Failed to send email to ${mail.to}:`, err.message);
@@ -704,7 +766,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
     const to = adSnap.data().Bearingno || "";
     try {
 
-      const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -715,7 +777,59 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
           listOfNewspapers: newsPaperList,
         }),
       });
-      console.log(`Email sent to department`, to, res);
+      if (response.status == 200) {
+        //create action log for mail sent
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Automatic Allocation sent  to newspaper mail sent to department Successfully to mail id ${to}`,
+          status: "Success",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      } else {
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Automatic Allocation sent  to newspaper mail sent to department Failed to mail id ${to}`,
+          status: "Failed",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      }
+      console.log(`Email sent to department`, to, response);
     } catch (err: Error | any) {
       console.error(`Failed to send email to ${to}:`, err.message);
     }
@@ -740,7 +854,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
         message: "Automatic allocation successful sent to newspapers",
         status: "Success",
         platform: platform,
-        networkip:req.ip||null,
+        networkip: req.ip || null,
         screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers as unknown as DocumentReference<DocumentData>[],
@@ -908,6 +1022,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
               // to: "jayanthbr@digi9.co.in",
               roNumber: `DIPR/ARN/${ronumbers + i}`,
               addressTo: "Technical Assistant",
+              allocationRef: allocationRef,
             });
             if (userData.display_name) {
               newsPaperList.push(userData.display_name);
@@ -960,17 +1075,70 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(mail),
         });
+        if (response.status == 200) {
+          //create action log for mail sent
+          const actionLog = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: mail.allocationRef, // each allocation doc ref
+            ronumber: mail.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 10,
+            message: `Manual Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${mail.to}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen,
+            Newspaper_allocation: {
+              Newspaper: [],
+              allotedtime: null,
+              allocation_type: null,
+              allotedby: null,
+            },
+            adRef: adRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+          });
+          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        } else {
+          const actionLog = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: mail.allocationRef, // each allocation doc ref
+            ronumber: mail.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 10,
+            message: `Manual Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} `,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen,
+            Newspaper_allocation: {
+              Newspaper: [],
+              allotedtime: null,
+              allocation_type: null,
+              allotedby: null,
+            },
+            adRef: adRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+          });
+          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        }
         console.log(`Email sent to ${mail.to}`, response);
       } catch (err: any) {
         console.error(`Failed to send email to ${mail.to}:`, err.message);
       }
+
     }
     // Send mail to department
     const advertisementNumber = adSnap.data().AdvertisementId || "";
     const to = adSnap.data().Bearingno || "";
     try {
 
-      const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -981,7 +1149,59 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
           listOfNewspapers: newsPaperList,
         }),
       });
-      console.log(`Email sent to department`, to, res);
+      if (response.status == 200) {
+        //create action log for mail sent
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Manual Allocation sent  to newspaper mail sent to department Successfully to mail id ${to}`,
+          status: "Success",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      } else {
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Manual Allocation sent  to newspaper mail sent to department Failed to mail id ${to}`,
+          status: "Failed",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      }
+      console.log(`Email sent to department`, to, response);
     } catch (err: Error | any) {
       console.error(`Failed to send email to ${to}:`, err.message);
     }
@@ -1236,6 +1456,58 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
           listOfNewspapers: newsPaperList,
         }),
       });
+      if (response.status == 200) {
+        //create action log for mail sent
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Automatic Allocation sent  to Deputy Director mail sent to department Successfully to mail id ${to}`,
+          status: "Success",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      } else {
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Automatic Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to}`,
+          status: "Failed",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      }
       console.log(`Email sent to department`, to, response);
     } catch (err: Error | any) {
       console.error(`Failed to send email to ${to}:`, err.message);
@@ -1500,10 +1772,62 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
           to,
           // to: "jayanthbr@digi9.co.in",
           advertisementNumber,
-          cc:process.env.CC_MAIL,
+          cc: process.env.CC_MAIL,
           listOfNewspapers: newsPaperList,
         }),
       });
+      if (response.status == 200) {
+        //create action log for mail sent
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Manual Allocation sent  to Deputy Director mail sent to department Successfully to mail id ${to}`,
+          status: "Success",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      } else {
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Manual Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to}`,
+          status: "Failed",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      }
       console.log(`Email sent to department`, to, response);
     } catch (err: Error | any) {
       console.error(`Failed to send email to ${to}:`, err.message);
@@ -1953,11 +2277,14 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
                 to: userEmail,
                 roNumber,
                 addressTo: "Technical Assistant",
+                allocationRef: docRef,
               });
+
               notificationApproved.push({
                 roNumber,
                 result: "approved",
                 resultComment: "and sent for approval to the vendor.",
+                allocationRef: docRef,
               });
             }
           }
@@ -1969,11 +2296,63 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
     // Send mail to users
     for (const mail of notifications) {
       try {
-        await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(mail),
         });
+        if (response.status == 200) {
+          //create action log for mail sent
+          const actionLog = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: mail.allocationRef, // each allocation doc ref
+            ronumber: mail.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 10,
+            message: `Deputy Approve Advertisement mail sent to vendors Successfully to mail id ${mail.to}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen,
+            Newspaper_allocation: {
+              Newspaper: [],
+              allotedtime: null,
+              allocation_type: null,
+              allotedby: null,
+            },
+            adRef: adRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+          });
+          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        } else {
+          const actionLog = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: mail.allocationRef, // each allocation doc ref
+            ronumber: mail.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 10,
+            message: `Deputy Approve Advertisement mail sent to vendors Failed to mail id ${mail.to} `,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen,
+            Newspaper_allocation: {
+              Newspaper: [],
+              allotedtime: null,
+              allocation_type: null,
+              allotedby: null,
+            },
+            adRef: adRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+          });
+          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        }
         console.log(`Email sent to ${mail.to}`);
       } catch (err: any) {
         console.error(`Failed to send email to ${mail.to}:`, err.message);
@@ -1992,7 +2371,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
 
       for (const mail of notificationApproved) {
         try {
-          await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
+          const response=await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -2002,6 +2381,58 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
               resultComment: mail.resultComment,
             }),
           });
+              if (response.status == 200) {
+          //create action log for mail sent
+          const actionLog = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: mail.allocationRef, // each allocation doc ref
+            ronumber: mail.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 10,
+            message: `Deputy Approve Advertisement Accepting email  sent to vendors Successfully to mail id ${toMail}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen,
+            Newspaper_allocation: {
+              Newspaper: [],
+              allotedtime: null,
+              allocation_type: null,
+              allotedby: null,
+            },
+            adRef: adRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+          });
+          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        } else {
+          const actionLog = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: mail.allocationRef, // each allocation doc ref
+            ronumber: mail.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 10,
+            message: `Deputy Approve Advertisement Accepting email  sent to vendors Failed to mail id ${toMail} `,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen,
+            Newspaper_allocation: {
+              Newspaper: [],
+              allotedtime: null,
+              allocation_type: null,
+              allotedby: null,
+            },
+            adRef: adRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+          });
+          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        }
           console.log(`Accepting email sent to ${toMail} for RO ${mail.roNumber}`);
         } catch (err: any) {
           console.error(`Failed to send accepting email to ${toMail}:`, err.message);
@@ -2011,18 +2442,70 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
 
     // Send mail to department
     try {
-      await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+      const response =await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to:data.Bearingno,
+          to: data.Bearingno,
           // to: "jayanthbr@digi9.co.in",
           advertisementNumber: data.AdvertisementId,
           // cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
-          cc:process.env.CC_MAIL,
+          cc: process.env.CC_MAIL,
           listOfNewspapers: newsPaperList,
         }),
       });
+       if (response.status == 200) {
+        //create action log for mail sent
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Deputy Approve Advertisementsent mail to department Successfully to mail id ${data.Bearingno}`,
+          status: "Success",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      } else {
+        const actionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Deputy Approve Advertisement mail sent to department Failed to mail id ${data.Bearingno}`,
+          status: "Failed",
+          platform: platform,
+          networkip: req.ip || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      }
       console.log(`Email sent to department`, data.Bearingno);
     } catch (err: Error | any) {
       console.error(`Failed to send email to ${data.Bearingno}:`, err.message);
@@ -2071,11 +2554,11 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
     const data = ad.data();
 
     await updateDoc(adRef, {
-      allotednewspapers:  [],
+      allotednewspapers: [],
       IsrequesPending: false,
       Status_Deputy: 0,
       approved: false,
-      caseworkerdraftnewspapers:data.allotednewspapers,
+      caseworkerdraftnewspapers: data.allotednewspapers,
     });
     const updatedSnap = await getDoc(adRef);
     const updatedData = updatedSnap.data();
@@ -2154,12 +2637,12 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
       await addDoc(collection(db, "actionLogs"), { ...actionLog });
 
     }
-    res.status(200).json({ 
-      success: true, 
+    res.status(200).json({
+      success: true,
       message: "PullBack operation performed successfully",
       data: updatedData
-      
-     });
+
+    });
   } catch (error: Error | any) {
 
     const actionLog = new ActionLog({
