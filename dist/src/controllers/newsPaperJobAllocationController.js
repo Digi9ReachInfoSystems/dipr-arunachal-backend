@@ -906,6 +906,59 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         addressTo: "Technical Assistant",
                     }),
                 });
+                if (response.status == 200) {
+                    //create action log for mail sent
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: newNewsPaperJobAllocationRef, // each allocation doc ref
+                        ronumber: `DIPR/ARN/${ronumbers}`,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Manual Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${newNewsPaper.email}`,
+                        status: "Success",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: adRef,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                else {
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: newNewsPaperJobAllocationRef, // each allocation doc ref
+                        ronumber: `DIPR/ARN/${ronumbers}`,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Manual Allocation sent  to newspaper mail sent to vendors Failed to mail id ${newNewsPaper.email} `,
+                        status: "Failed",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: adRef,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
                 console.log(`Email sent to ${newNewsPaper.email}`, response);
             }
             catch (err) {
