@@ -2,6 +2,7 @@ import { getFirestore, doc, getDoc, writeBatch, serverTimestamp, getDocs, collec
 import moment from "moment-timezone";
 import db from "../configs/firebase.js";
 import ActionLog, { AllocationType } from "../models/actionLogModel.js";
+import { da } from "date-fns/locale";
 export const updateApproveCvAndTimeAllotment = async (req, res) => {
     try {
         const { documentIds, addressTo, to, advertisementNumber } = req.body;
@@ -379,7 +380,7 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
         const usersEmailData = userEmailDocSnap.data();
         const toMail = usersEmailData["technicalassistantadvtgmailcom"];
         try {
-            const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -393,7 +394,60 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
                     addressTo: "ADVT Cell"
                 }),
             });
-            console.log("Mail sent successfully:", res);
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                    islogin: false,
+                    rodocref: docRef, // each allocation doc ref
+                    ronumber: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Vendor Approve Release Order mail sent successfully to department ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: data.adref,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                    islogin: false,
+                    rodocref: docRef, // each allocation doc ref
+                    ronumber: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Vendor Approve Release Order mail failed to send to department ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: data.adref,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            console.log("Mail sent successfully:", response);
         }
         catch (error) {
             console.error("❌ Error in sending mail:", error);
@@ -404,7 +458,7 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
             });
         }
         try {
-            const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/VendorStausDept`, {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/VendorStausDept`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -415,7 +469,60 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
                     vendorContact: userData.email,
                 }),
             });
-            console.log("Mail sent successfully:", res);
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                    islogin: false,
+                    rodocref: docRef, // each allocation doc ref
+                    ronumber: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Vendor Approve Release Order mail sent successfully to department ${data.Bearingno}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: data.adref,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                    islogin: false,
+                    rodocref: docRef, // each allocation doc ref
+                    ronumber: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Vendor Approve Release Order mail failed to send to department ${data.Bearingno}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: data.adref,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            console.log("Mail sent successfully:", response);
         }
         catch (error) {
             console.error("❌ Error in sending mail:", error);
@@ -538,7 +645,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
         const toMailTwo = usersEmailData["ddipradvtgmailcom"];
         if (data.manuallyallotted == true) {
             try {
-                const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -552,7 +659,60 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         addressTo: "ADVT Cell"
                     }),
                 });
-                console.log("Mail sent successfully:", res);
+                if (response.status == 200) {
+                    //create action log for mail sent
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: docRef, // each allocation doc ref
+                        ronumber: null,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Vendor Reject Release Order mail sent successfully to department ${toMail}`,
+                        status: "Success",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: data.adref,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                else {
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: docRef, // each allocation doc ref
+                        ronumber: null,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Vendor Reject Release Order mail failed to send to department ${toMail}`,
+                        status: "Failed",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: data.adref,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                console.log("Mail sent successfully:", response);
             }
             catch (error) {
                 console.error("❌ Error in sending mail:", error);
@@ -563,7 +723,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                 });
             }
             try {
-                const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -577,7 +737,60 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         addressTo: "ADVT Cell"
                     }),
                 });
-                console.log("Mail sent successfully:", res);
+                if (response.status == 200) {
+                    //create action log for mail sent
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: docRef, // each allocation doc ref
+                        ronumber: null,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Vendor Reject Release Order mail sent successfully to department ${toMailTwo}`,
+                        status: "Success",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: data.adref,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                else {
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: docRef, // each allocation doc ref
+                        ronumber: null,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Vendor Reject Release Order mail failed to send to department ${toMailTwo}`,
+                        status: "Failed",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: data.adref,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                console.log("Mail sent successfully:", response);
             }
             catch (error) {
                 console.error("❌ Error in sending mail:", error);
@@ -700,7 +913,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
             }
             //reject Mails
             try {
-                const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -714,7 +927,60 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         addressTo: "ADVT Cell"
                     }),
                 });
-                console.log("Mail sent successfully:", res);
+                if (response.status == 200) {
+                    //create action log for mail sent
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: docRef, // each allocation doc ref
+                        ronumber: null,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Vendor Reject Release Order mail sent successfully to department ${toMail}`,
+                        status: "Success",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: data.adref,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                else {
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: docRef, // each allocation doc ref
+                        ronumber: null,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Vendor Reject Release Order mail failed to send to department ${toMail}`,
+                        status: "Failed",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: data.adref,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                console.log("Mail sent successfully:", response);
             }
             catch (error) {
                 console.error("❌ Error in sending mail:", error);
@@ -725,7 +991,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                 });
             }
             try {
-                const res = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -739,7 +1005,60 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         addressTo: "ADVT Cell"
                     }),
                 });
-                console.log("Mail sent successfully:", res);
+                if (response.status == 200) {
+                    //create action log for mail sent
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: docRef, // each allocation doc ref
+                        ronumber: null,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Vendor Reject Release Order mail sent successfully to department ${toMailTwo}`,
+                        status: "Success",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: data.adref,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                else {
+                    const actionLog = new ActionLog({
+                        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                        islogin: false,
+                        rodocref: docRef, // each allocation doc ref
+                        ronumber: null,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 10,
+                        message: `Vendor Reject Release Order mail failed to send to department ${toMailTwo}`,
+                        status: "Failed",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: data.adref,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                console.log("Mail sent successfully:", response);
             }
             catch (error) {
                 console.error("❌ Error in sending mail:", error);
