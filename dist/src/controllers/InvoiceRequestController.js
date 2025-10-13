@@ -1507,6 +1507,10 @@ export const assistantApproveInvoiceRequest = async (req, res) => {
             description: invoiceData.billno,
             invoiceref: invoiceRef,
             amount: invoiceData.invoiceamount,
+            userrerf: invoiceData.userRef,
+            billno: invoiceData.billno,
+            billingaddress: invoiceData.billingAddress,
+            deptName: invoiceData.DeptName
         });
         // update user collection
         await updateDoc(userRef, {
