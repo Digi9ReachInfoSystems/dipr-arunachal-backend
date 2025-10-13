@@ -1645,7 +1645,7 @@ export const assistantApproveInvoiceRequest = async (req: Request, res: Response
             description: invoiceData.billno,
             invoiceref: invoiceRef,
             amount: invoiceData.invoiceamount,
-            userrerf:invoiceData.userRef,
+            userrerf:invoiceData.Userref,
             billno: invoiceData.billno,
             billingaddress: invoiceData.billingAddress,
             deptName: invoiceData.DeptName
