@@ -4,4 +4,5 @@ export declare const createInvoice: (req: Request, res: Response) => Promise<Res
 export declare const editInvoice: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const deputyInvoiceSendBack: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const deputyApproveInvoiceRequestPutUp: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+export declare const deputyApproveInvoiceRequestSendForward: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 //# sourceMappingURL=InvoiceRequestController.d.ts.map
