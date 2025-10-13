@@ -131,14 +131,14 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         switch (user_role) {
             case "IsLdc1":
                 division = 1;
-                invoice='UDC - 2'
+                invoice = 'UDC - 2'
                 break;
             case "IsLdc2":
                 division = 2;
-                invoice='LDC - 1'
+                invoice = 'LDC - 1'
                 break;
             default:
-                invoice='UDC - 1'
+                invoice = 'UDC - 1'
                 division = 3;
                 break;
         }
@@ -175,7 +175,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             ronumber: null,
             docrefinvoice: null,
             old_data: {},
-            edited_data:  {},
+            edited_data: {},
             user_role,
             action: 18,
             message: "NoteSheet Created new document created in approved_add collection",
@@ -197,16 +197,47 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         await addDoc(collection(db, "actionLogs"), { ...actionLog })
 
         // create document in bugdetDetails collection
-        const budgetDetailsCollection = collection(db, "budgetDetails");
+        const budgetDetailsCollection = collection(db, "bugdetDetails");
         const budgetDetailsRef = doc(budgetDetailsCollection);
         await setDoc(budgetDetailsRef, {
             amountDeducted: totalamount,
             date: serverTimestamp(),
             invoiceRoNumber: `NS/DIPR-${noteSheetNo}`,
-            invoice:invoice,
-            total:adminData.Budget,
-            
+            invoice: invoice,
+            total: adminData.Budget,
+            remaining: adminData.Budget - totalamount,
+            approvedRef: approved_addRef
         });
+        //create action log
+        const actionLogBudgetDetails = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 18,
+            message: "NoteSheet Created new document created in bugdetDetails collection",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approved_addRef || null,
+
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogBudgetDetails })
+
+        //send mail to department
 
 
         //Increment admin notesheet number
@@ -214,8 +245,148 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             notesheetno: noteSheetNo + 1
         });
         const updatedData = (await getDoc(adminRef)).data();
+         //create action log
+         const actionLogAdminData = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: adminData,
+            edited_data: updatedData||{},
+            user_role,
+            action: 18,
+            message: "NoteSheet Created new document updated in adminData collection",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approved_addRef || null,
+
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogAdminData })
+
+        //update user collection Data
+        await updateDoc(UserRef, {
+            approvedlist:approvedList
+        });
+        const updatedUserData = (await getDoc(UserRef)).data();
+        //create action log
+        const actionLogUserData = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: userData,
+            edited_data: updatedUserData||{},
+            user_role,
+            action: 18,
+            message: "NoteSheet Created new document updated in user collection",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approved_addRef || null, 
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogUserData })
+
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        let toMail =usersEmailData["ddipradvtgmailcom"];
         //create action log
 
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/assistantBill`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMail,
+                    addressTo: (userData && typeof userData === "object" && "display_name" in userData) ? (userData as any).display_name : "",
+                    // to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: `NS/DIPR-${noteSheetNo}`,
+                    amount: totalamount,
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `NoteSheet Created mail sent successfully to   ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            } else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `NoteSheet Createdmail failed to send to  ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
         res.status(200).json({ success: true, notesheetno: noteSheetNo });
 
     } catch (error: Error | any) {
