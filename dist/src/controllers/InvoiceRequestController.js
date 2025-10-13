@@ -4,7 +4,7 @@ import db from "../configs/firebase.js";
 import Invoice from "../models/invoiceRequestModel.js";
 // Import ActionLog model or interface
 import ActionLog from "../models/actionLogModel.js";
-import { ro } from "date-fns/locale";
+import { ca, ro } from "date-fns/locale";
 export const getInvoiceRequestCount = async (req, res) => {
     const { year } = req.params;
     if (!year) {
@@ -153,7 +153,7 @@ export const createInvoice = async (req, res) => {
                 Invoice_Assistant: 0,
                 isuploaded: true,
                 Status_Vendor: 1,
-                Posted: Userref,
+                Posted: userRef,
                 invoicerefList,
                 Release_order_no: Ronumber,
                 Invoice_deputy: 0
@@ -626,6 +626,510 @@ export const editInvoice = async (req, res) => {
         });
     }
     catch (error) {
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+export const deputyInvoiceSendBack = async (req, res) => {
+    const { feedback, invoiceId, user_id, user_role, platform, screen } = req.body;
+    //update invoice
+    const invoiceRef = doc(db, "Invoice_Request", invoiceId);
+    const invoiceSnapshot = await getDoc(invoiceRef);
+    if (!invoiceSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "Invoice not found",
+        });
+    }
+    const invoiceData = invoiceSnapshot.data();
+    try {
+        await updateDoc(invoiceRef, {
+            deputydirecotor: feedback,
+            deputyDirector_status: 10,
+            DateOfInvoice: serverTimestamp(),
+            sendAgain: true,
+        });
+        const updatedData = (await getDoc(invoiceRef)).data();
+        // create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: invoiceData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 13,
+            message: "Invoice send Again Action successfull by Deputy updated Invoice Request document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        //update Advertisement document
+        const adRef = invoiceData.advertiseRef;
+        const adSnapshot = await getDoc(adRef);
+        const addOldData = adSnapshot.data();
+        await updateDoc(adRef, {
+            Invoice_deputy: 3,
+        });
+        const updatedAdData = (await getDoc(adRef)).data();
+        // create action log
+        const actionLogAdd = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: addOldData || {},
+            edited_data: updatedAdData || {},
+            user_role,
+            action: 13,
+            message: "Invoice send Again Action successfull by Deputy updated Advertisement Document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogAdd });
+        //send mail to vendor
+        const userSnap = await getDoc(invoiceData.Userref);
+        const userData = userSnap.data();
+        if (!userData) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+        const toMail = (userData && typeof userData === "object" && "email" in userData) ? userData.email : "";
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/BillResubmittedDD`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: (userData && typeof userData === "object" && "email" in userData) ? userData.email : "",
+                    addressTo: (userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "",
+                    // to: "jayanthbr@digi9.co.in",
+                    roNumber: invoiceData.Ronumber,
+                    vendorName: "Deputy Director",
+                    vendorContact: (userData && typeof userData === "object" && "email" in userData) ? userData.email : "",
+                    reasonOfRejection: feedback
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: invoiceData.jobref, // each allocation doc ref
+                    ronumber: invoiceData.Ronumber,
+                    docrefinvoice: invoiceRef,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice sendAgain mail sent successfully to vendor  ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: adRef,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: invoiceData.jobref, // each allocation doc ref
+                    ronumber: invoiceData.Ronumber,
+                    docrefinvoice: invoiceRef,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice sendAgain  mail failed to send to vendor ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: adRef,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+        res.status(200).json({
+            success: true,
+            message: "Invoice updated successfully",
+        });
+    }
+    catch (error) {
+        // create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 13,
+            message: `Invoice send Again Action by Deputy Failed error: ${error.message} `,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+export const deputyApproveInvoiceRequestPutUp = async (req, res) => {
+    const { invoiceId, InvoiceUrl, user_id, user_role, platform, screen } = req.body;
+    // fetch invoice
+    const invoiceRef = doc(db, "Invoice_Request", invoiceId);
+    const invoiceSnapshot = await getDoc(invoiceRef);
+    if (!invoiceSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "Invoice not found",
+        });
+    }
+    const invoiceData = invoiceSnapshot.data();
+    try {
+        //update invoice
+        await updateDoc(invoiceRef, {
+            Assitanttatus: 0,
+            deputyDirector_status: 1,
+            DateOfInvoice: serverTimestamp(),
+            InvoiceUrl: InvoiceUrl,
+        });
+        const updatedData = (await getDoc(invoiceRef)).data();
+        // create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: invoiceData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 14,
+            message: "Invoice Request Approve - Put Up Action  by Deputy updated Invoice Request document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        //update Advertisement document
+        const adRef = invoiceData.advertiseRef;
+        const adSnapshot = await getDoc(adRef);
+        const addOldData = adSnapshot.data();
+        await updateDoc(adRef, {
+            Invoice_Assistant: 1,
+            Invoice_deputy: 0,
+        });
+        const updatedAdData = (await getDoc(adRef)).data();
+        // create action log
+        const actionLogAdd = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: addOldData || {},
+            edited_data: updatedAdData || {},
+            user_role,
+            action: 14,
+            message: "Invoice Request Approve - Put Up Action  by  Deputy updated Advertisement Document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogAdd });
+        //send mail to Assistant Bill
+        const userSnap = await getDoc(invoiceData.Userref);
+        const userData = userSnap.data();
+        if (!userData) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        let toMail = null;
+        switch ((userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "") {
+            case "Arun Bhoomi":
+            case "Eastern Sentinel":
+            case "The Arunachal Times":
+            case "The Arunachal Pioneer":
+            case "The Dawn Lit Post":
+                toMail = usersEmailData["Idciprarungmailcom"];
+                break;
+            case "Arunachal front":
+                toMail = usersEmailData["udciprgmailcom"];
+                break;
+            default:
+                toMail = usersEmailData["udc2iprgmailcom"];
+        }
+        if (!toMail) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found",
+            });
+        }
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/assistantBill`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    // to: (userData && typeof userData === "object" && "email" in userData) ? (userData as any).email : "",
+                    addressTo: (userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "",
+                    to: "jayanthbr@digi9.co.in",
+                    roNumber: invoiceData.Ronumber,
+                    vendorName: "Deputy Director",
+                    vendorContact: usersEmailData["ddipradvtgmailcom"],
+                    resultComment: "put up"
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: invoiceData.jobref, // each allocation doc ref
+                    ronumber: invoiceData.Ronumber,
+                    docrefinvoice: invoiceRef,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request put up Assistant Bill mail sent successfully to   ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: adRef,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: invoiceData.jobref, // each allocation doc ref
+                    ronumber: invoiceData.Ronumber,
+                    docrefinvoice: invoiceRef,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice request put up Assistant Bill mail failed to send to  ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: adRef,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+        // send mail to approve tds
+        const toMail2 = (userData && typeof userData === "object" && "email" in userData) ? userData.email : "";
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/approvedTDCase`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    // to: (userData && typeof userData === "object" && "email" in userData) ? (userData as any).email : "",
+                    addressTo: (userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "",
+                    to: "jayanthbr@digi9.co.in",
+                    roNumber: invoiceData.Ronumber,
+                    advertisementNumber: invoiceData.invoiceamount,
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: invoiceData.jobref, // each allocation doc ref
+                    ronumber: invoiceData.Ronumber,
+                    docrefinvoice: invoiceRef,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request put up approvedTDCase mail sent successfully to   ${toMail2}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: adRef,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: invoiceData.jobref, // each allocation doc ref
+                    ronumber: invoiceData.Ronumber,
+                    docrefinvoice: invoiceRef,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice request put up approvedTDCase mail failed to send to  ${toMail2}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: adRef,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+        res.status(200).json({ success: true, message: "Invoice Request put up successfully" });
+    }
+    catch (error) {
+        // create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 14,
+            message: `Invoice Request Approve - Put Up Action  by Deputy Failed error: ${error.message}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
         console.error("❌ Error updating invoice:", error);
         res.status(500).json({
             success: false,
