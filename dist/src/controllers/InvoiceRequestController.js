@@ -1406,4 +1406,257 @@ export const deputyApproveInvoiceRequestSendForward = async (req, res) => {
         });
     }
 };
+export const assistantApproveInvoiceRequest = async (req, res) => {
+    const { invoiceId, user_id, user_role, platform, screen } = req.body;
+    //get invoice data
+    const invoiceRef = doc(db, "Invoice_Request", invoiceId);
+    const invoiceSnapshot = await getDoc(invoiceRef);
+    if (!invoiceSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "Invoice not found",
+        });
+    }
+    const invoiceData = invoiceSnapshot.data();
+    try {
+        //update invoice
+        await updateDoc(invoiceRef, {
+            Assitanttatus: 2,
+        });
+        const updatedData = (await getDoc(invoiceRef)).data();
+        // create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: invoiceData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 16,
+            message: "Invoice Request Approve  by Assistant updated Invoice Request document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        //update Advertisement document
+        const adRef = invoiceData.advertiseRef;
+        const adSnapshot = await getDoc(adRef);
+        const addOldData = adSnapshot.data();
+        await updateDoc(adRef, {
+            Invoice_Assistant: 1,
+            Invoice_deputy: 0,
+        });
+        const updatedAdData = (await getDoc(adRef)).data();
+        // create action log
+        const actionLogAdd = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: addOldData || {},
+            edited_data: updatedAdData || {},
+            user_role,
+            action: 16,
+            message: "Invoice RequestApprove  by Assistant updated Advertisement Document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogAdd });
+        //user collection Data
+        const userRef = doc(db, "Users", user_id);
+        const userSnapshot = await getDoc(userRef);
+        const userData = userSnapshot.data();
+        if (!userSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+        let approvedlist = [];
+        if (userData && typeof userData === "object" && "approvedlist" in userData) {
+            approvedlist = userData.listOfAprroved;
+        }
+        approvedlist.push({
+            adref: invoiceData.advertiseRef,
+            id: invoiceData.Ronumber,
+            date: invoiceData.DateOfInvoice,
+            departmenttype: invoiceData.TypeOfDepartment,
+            description: invoiceData.billno,
+            invoiceref: invoiceRef,
+            amount: invoiceData.invoiceamount,
+        });
+        // update user collection
+        await updateDoc(userRef, {
+            listOfAprroved: approvedlist,
+        });
+        const updatedUserData = (await getDoc(userRef)).data();
+        //create action log
+        const actionLogUser = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: userData || {},
+            edited_data: updatedUserData || {},
+            user_role,
+            action: 16,
+            message: "Invoice RequestApprove  by Assistant updated User Document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogUser });
+        res.status(200).json({ success: true, message: "Invoice Request approve by Assistant successfully" });
+    }
+    catch (error) {
+        // create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 16,
+            message: `Invoice Request Approve  by Assistant Failed Error- ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+export const assistantSubmitInvoiceRequest = async (req, res) => {
+    const { invoiceId, user_id, user_role, platform, screen } = req.body;
+    //get invoice data
+    const invoiceRef = doc(db, "Invoice_Request", invoiceId);
+    const invoiceSnapshot = await getDoc(invoiceRef);
+    if (!invoiceSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "Invoice not found",
+        });
+    }
+    const invoiceData = invoiceSnapshot.data();
+    try {
+        //update invoice
+        await updateDoc(invoiceRef, {
+            isCompleted: false,
+            isSendForward: false,
+            isRead: false
+        });
+        const updatedData = (await getDoc(invoiceRef)).data();
+        // create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: invoiceData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 17,
+            message: "Invoice Request Submit  by Assistant updated Invoice Request document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        res.status(200).json({ success: true, message: "Invoice Request submit by Assistant successfully" });
+    }
+    catch (error) {
+        // create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 17,
+            message: `Invoice Request Submit  by Assistant Failed Error- ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
 //# sourceMappingURL=InvoiceRequestController.js.map
