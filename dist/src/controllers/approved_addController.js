@@ -83,7 +83,7 @@ export const createNoteSheet = async (req, res) => {
             });
         }
         const adminRef = adminSnapshot.ref;
-        console.log("adminRef", adminRef);
+        // console.log("adminRef", adminRef);
         ;
         const noteSheetNo = adminData.notesheetno;
         //create document in approved_add collection
@@ -306,6 +306,7 @@ export const createNoteSheet = async (req, res) => {
                     },
                     adRef: null,
                     actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approved_addRef || null,
                 });
                 const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
             }
@@ -333,6 +334,7 @@ export const createNoteSheet = async (req, res) => {
                     },
                     adRef: null,
                     actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approved_addRef || null,
                 });
                 const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
             }
