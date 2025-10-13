@@ -1514,7 +1514,7 @@ export const assistantApproveInvoiceRequest = async (req, res) => {
         });
         // update user collection
         await updateDoc(userRef, {
-            listOfAprroved: approvedlist,
+            approvedlist: approvedlist,
         });
         const updatedUserData = (await getDoc(userRef)).data();
         //create action log
@@ -1655,6 +1655,90 @@ export const assistantSubmitInvoiceRequest = async (req, res) => {
             }
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+export const invoiceAcknowledgeDeputy = async (req, res) => {
+    const { approvedAdId, FeedbackDeputy, user_id, user_role, platform, screen } = req.body;
+    try {
+        //read document from user collection
+        const userRef = doc(db, "Users", user_id);
+        const userSnapshot = await getDoc(userRef);
+        if (!userSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+        const userData = userSnapshot.data();
+        if (!userData) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+        //read document from approve_add collection
+        const approvedAdRef = doc(db, "approved_add", approvedAdId);
+        const approvedAdSnapshot = await getDoc(approvedAdRef);
+        if (!approvedAdSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved Ad not found",
+            });
+        }
+        const approvedAdData = approvedAdSnapshot.data();
+        let notesheetdetails = approvedAdData.notesheetdetails || [];
+        notesheetdetails.push({
+            createddate: moment().tz("Asia/Kolkata").toDate(),
+            feedback: FeedbackDeputy,
+            userrole: userData.display_name
+        });
+        //update approved_ad document
+        await updateDoc(approvedAdRef, {
+            deputyStatus: 2,
+            FeedbackDeputy: FeedbackDeputy,
+            ispending: true,
+            dateofAproval: serverTimestamp(),
+            directorStatus: 0,
+            dateTimeDD: serverTimestamp(),
+            assitantStattus: 3,
+            notesheetdetails: notesheetdetails
+        });
+        const updatedData = (await getDoc(approvedAdRef)).data();
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 17,
+            message: "Invoice Request Approve  by DEputy updated approved add document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+    }
+    catch (error) {
         console.error("❌ Error updating invoice:", error);
         res.status(500).json({
             success: false,
