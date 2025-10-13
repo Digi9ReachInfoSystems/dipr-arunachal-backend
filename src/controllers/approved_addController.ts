@@ -111,16 +111,31 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         const userData = userSnapshot.data();
 
 
-        //Get First Document of adminData collection to get admin Id
-        const adminRef = doc(db, "adminData");
-        const adminSnapshot = await getDoc(adminRef);
-        if (!adminSnapshot.exists()) {
+        //Get First Document of admindata collection to get admin Id
+        const adminQuerySnap = await getDocs(collection(db, "admindata"));
+        if (adminQuerySnap.empty) {
+            return res.status(404).json({ success: false, message: "Admin not found" });
+        }
+        const adminSnapshot = adminQuerySnap.docs[0];
+        if (!adminSnapshot) {
             return res.status(404).json({
                 success: false,
                 message: "Admin not found",
             });
         }
         const adminData = adminSnapshot.data();
+        if (!adminSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found",
+            });
+        }
+        const adminRef = adminSnapshot.ref;
+
+        console.log("adminRef", adminRef);
+       ;
+        
+       
         const noteSheetNo = adminData.notesheetno;
 
         //create document in approved_add collection
@@ -142,6 +157,10 @@ export const createNoteSheet = async (req: Request, res: Response) => {
                 division = 3;
                 break;
         }
+        let notesheetdetails: any = [];
+        notesheetdetails.push({
+            
+        })
 
         await setDoc(approved_addRef, {
             adddata: approvedList,
@@ -160,7 +179,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             userref: UserRef,
             statusUnderSecretary: 10,
             notesheetdetails: [{
-                createddate: serverTimestamp(),
+                createddate: moment().tz("Asia/Kolkata").toDate(),
                 feedback: assitantFeedback,
                 userrole: userData.display_name
             }]
@@ -245,15 +264,15 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             notesheetno: noteSheetNo + 1
         });
         const updatedData = (await getDoc(adminRef)).data();
-         //create action log
-         const actionLogAdminData = new ActionLog({
+        //create action log
+        const actionLogAdminData = new ActionLog({
             user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
             islogin: false,
             rodocref: null,
             ronumber: null,
             docrefinvoice: null,
             old_data: adminData,
-            edited_data: updatedData||{},
+            edited_data: updatedData || {},
             user_role,
             action: 18,
             message: "NoteSheet Created new document updated in adminData collection",
@@ -276,7 +295,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
 
         //update user collection Data
         await updateDoc(UserRef, {
-            approvedlist:approvedList
+            approvedlist: approvedList
         });
         const updatedUserData = (await getDoc(UserRef)).data();
         //create action log
@@ -287,7 +306,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             ronumber: null,
             docrefinvoice: null,
             old_data: userData,
-            edited_data: updatedUserData||{},
+            edited_data: updatedUserData || {},
             user_role,
             action: 18,
             message: "NoteSheet Created new document updated in user collection",
@@ -303,7 +322,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
                 allocation_type: null,
                 allotedby: null
             },
-            note_sheet_allocation: approved_addRef || null, 
+            note_sheet_allocation: approved_addRef || null,
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLogUserData })
 
@@ -313,11 +332,11 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             throw new Error("UsersEmail document does not exist");
         }
         const usersEmailData = userEmailDocSnap.data();
-        let toMail =usersEmailData["ddipradvtgmailcom"];
+        let toMail = usersEmailData["ddipradvtgmailcom"];
         //create action log
 
         try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/assistantBill`, {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/notesheetcreate`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -387,9 +406,37 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
-        res.status(200).json({ success: true, notesheetno: noteSheetNo });
+        res.status(200).json({ success: true,message: "NoteSheet created successfully", notesheetno: noteSheetNo });
 
     } catch (error: Error | any) {
+         // create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 18,
+            message: `NoteSheet Created  Failed Error: ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation:  null,
+
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog })
         console.error("Error in Invoice_Request count:", error);
         res.status(500).json({
             success: false,
