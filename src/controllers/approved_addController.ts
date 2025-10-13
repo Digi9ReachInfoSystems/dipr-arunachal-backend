@@ -132,10 +132,10 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         }
         const adminRef = adminSnapshot.ref;
 
-        console.log("adminRef", adminRef);
-       ;
-        
-       
+        // console.log("adminRef", adminRef);
+        ;
+
+
         const noteSheetNo = adminData.notesheetno;
 
         //create document in approved_add collection
@@ -159,7 +159,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         }
         let notesheetdetails: any = [];
         notesheetdetails.push({
-            
+
         })
 
         await setDoc(approved_addRef, {
@@ -372,6 +372,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
                     },
                     adRef: null,
                     actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approved_addRef || null,
                 });
                 const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
             } else {
@@ -398,6 +399,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
                     },
                     adRef: null,
                     actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approved_addRef || null,
                 });
                 const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
             }
@@ -406,10 +408,10 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
-        res.status(200).json({ success: true,message: "NoteSheet created successfully", notesheetno: noteSheetNo });
+        res.status(200).json({ success: true, message: "NoteSheet created successfully", notesheetno: noteSheetNo });
 
     } catch (error: Error | any) {
-         // create action log
+        // create action log
         const actionLog = new ActionLog({
             user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
             islogin: false,
@@ -433,7 +435,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
                 allocation_type: null,
                 allotedby: null
             },
-            note_sheet_allocation:  null,
+            note_sheet_allocation: null,
 
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLog })
