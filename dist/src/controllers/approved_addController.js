@@ -43,6 +43,8 @@ export const getApproveAddCount = async (req, res) => {
 export const createNoteSheet = async (req, res) => {
     const { userref, approvedList, totalamount, assitantFeedback, user_id, user_role, platform, screen } = req.body;
     try {
+        // console.log("request body", req.body);
+        console.dir(req.body, { depth: null });
         //pepare userRef and get userDetails
         const collectionData = userref.split("/");
         let UserRef = null;
