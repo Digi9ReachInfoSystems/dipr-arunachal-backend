@@ -3624,7 +3624,7 @@ export const invoiceNoteSheetRejectIsSc = async (req: Request, res: Response) =>
                     // to: "jayanthbr@digi9.co.in",
                     notesheetNumber: approvedAdData.notesheetString,
                     cc: cc,
-                    addressTo:"Secretary"
+                    addressTo: "Secretary"
 
                 }),
             });
@@ -3689,7 +3689,7 @@ export const invoiceNoteSheetRejectIsSc = async (req: Request, res: Response) =>
         catch (error) {
             console.error("Error sending email:", error);
         }
-        
+
         res.status(200).json({ success: true, message: "Invoice Request Rejected  by IsSc successfully" });
 
 
@@ -3779,13 +3779,13 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
 
         //update approved_ad document
         await updateDoc(approvedAdRef, {
-            FaoStatus:10,
-            feedbackFao:feedbackFao,
+            FaoStatus: 10,
+            feedbackFao: feedbackFao,
             dateofAproval: serverTimestamp(),
-            datetimeFao:serverTimestamp(),
-            deputyStatus:0,
-            directorStatus:10,
-            assitantStattus:1,
+            datetimeFao: serverTimestamp(),
+            deputyStatus: 0,
+            directorStatus: 10,
+            assitantStattus: 1,
             notesheetdetails: notesheetdetails
         });
         const updatedData = (await getDoc(approvedAdRef)).data();
@@ -3800,7 +3800,7 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
             old_data: approvedAdData || {},
             edited_data: updatedData || {},
             user_role,
-            action: 27,
+            action: 28,
             message: "Invoice Request Reject  by FAO updated approved add document",
             status: "Success",
             platform: platform,
@@ -3818,7 +3818,7 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLog })
 
-       
+
 
         //mail send to department - approvedTFao
         const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
@@ -3859,7 +3859,7 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
                     // to: "jayanthbr@digi9.co.in",
                     notesheetNumber: approvedAdData.notesheetString,
                     cc: cc,
-                    addressTo:"Director"
+                    addressTo: "Director"
 
                 }),
             });
@@ -3924,7 +3924,7 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
         catch (error) {
             console.error("Error sending email:", error);
         }
-        
+
         res.status(200).json({ success: true, message: "Invoice Request Rejected  by FAO successfully" });
 
 
@@ -3939,8 +3939,556 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
             old_data: {},
             edited_data: {},
             user_role,
-            action: 27,
+            action: 28,
             message: `Invoice Request Reject  by FAO Failed Error: ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog })
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+
+export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res: Response) => {
+    const {
+        approvedAdId,
+        user_id,
+        user_role,
+        platform,
+        screen
+    } = req.body
+    //read document from user collection
+    const userRef = doc(db, "Users", user_id)
+    const userSnapshot = await getDoc(userRef)
+    if (!userSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    const userData = userSnapshot.data();
+    if (!userData) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    //read document from approve_add collection
+    const approvedAdRef = doc(db, "approved_add", approvedAdId)
+    try {
+
+        const approvedAdSnapshot = await getDoc(approvedAdRef)
+        if (!approvedAdSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved Ad not found",
+            });
+        }
+        const approvedAdData = approvedAdSnapshot.data();
+        
+
+        //update approved_ad document
+        await updateDoc(approvedAdRef, {
+            isaprroved:true,
+            deputyStatus:5,
+            directorStatus:5,
+            FaoStatus:5,
+            accountant_status:1,
+            ispending:false,
+            assitantStattus:5,
+            dateofAproval:serverTimestamp()
+        });
+        const updatedData = (await getDoc(approvedAdRef)).data();
+
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: approvedAdData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 29,
+            message: "Invoice Request Approve  by FAO for selecting LDC/UDC updated approved add document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog })
+        
+        
+        //read data from adminData and update budget
+        const adminQuerySnap = await getDocs(collection(db, "admindata"));
+        if (adminQuerySnap.empty) {
+            return res.status(404).json({ success: false, message: "Admin not found" });
+        }
+        const adminSnapshot = adminQuerySnap.docs[0];
+        if (!adminSnapshot) {
+            return res.status(404).json({
+                success: false,
+                message: "Admin not found",
+            });
+        }
+        const adminData = adminSnapshot.data();
+        await updateDoc(doc(db, "admindata", adminSnapshot.id), {
+            Budget: adminData.Budget - approvedAdData.TotalAmount
+        })
+        const updatedAdminData = (await getDoc(doc(db, "admindata", adminSnapshot.id))).data();
+        //create acion log
+        const actionLogAdmin = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: adminData || {},
+            edited_data: updatedAdminData || {},
+            user_role,
+            action: 29,
+            message: "Invoice Request Approve  by FAO for selecting LDC/UDC updated admindata document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogAdmin })
+
+        //mail send to uploadSanction
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        let toMail = ``;
+        switch ((userData && typeof userData === "object" && "display_name" in userData) ? (userData as any).display_name : "") {
+            case "Arun Bhoomi":
+            case "Eastern Sentinel":
+            case "The Arunachal Times":
+            case "The Arunachal Pioneer":
+            case "The Dawn Lit Post":
+                toMail = usersEmailData["Idciprarungmailcom"];
+                break;
+            case "Arunachal front":
+                toMail = usersEmailData["udciprgmailcom"];
+                break;
+            default:
+                toMail = usersEmailData["udc2iprgmailcom"];
+        }
+        if (!toMail) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found",
+            });
+        }
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/uploadSanction`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: approvedAdData.notesheetString,
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Approve  by FAO for selecting LDC/UDC mail sent successfully to department  ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            } else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Approve  by FAO for selecting LDC/UDC  mail failed to send to department ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+
+        //send mail to acceptthreefive
+        let  toMailTwo = usersEmailData["faoiprgmailcom"];
+        const cc=usersEmailData["ddipradvtgmailcom"];
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accept35`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMailTwo,
+                    // to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: approvedAdData.notesheetString,
+                    addressTo:"FAO",
+                    result:"accepted.",
+                    cc:cc,
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Approve  by FAO for selecting LDC/UDC mail sent successfully to department  ${toMailTwo}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            } else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Approve  by FAO for selecting LDC/UDC  mail failed to send to department ${toMailTwo}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+
+        res.status(200).json({ success: true, message: "Invoice Request Approve  by FAO for selecting LDC/UDC successfully" });
+
+
+    } catch (error: Error | any) {
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 29,
+            message: `Invoice Request Approve  by FAO for selecting LDC/UDC Failed Error: ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog })
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+
+
+export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req: Request, res: Response) => {
+    const {
+        approvedAdId,
+        user_id,
+        user_role,
+        platform,
+        screen
+    } = req.body
+    //read document from user collection
+    const userRef = doc(db, "Users", user_id)
+    const userSnapshot = await getDoc(userRef)
+    if (!userSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    const userData = userSnapshot.data();
+    if (!userData) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    //read document from approve_add collection
+    const approvedAdRef = doc(db, "approved_add", approvedAdId)
+    try {
+
+        const approvedAdSnapshot = await getDoc(approvedAdRef)
+        if (!approvedAdSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved Ad not found",
+            });
+        }
+        const approvedAdData = approvedAdSnapshot.data();
+        
+
+        //update approved_ad document
+        await updateDoc(approvedAdRef, {
+            FaoStatus:2,
+            statusUnderSecretary:0,
+
+        });
+        const updatedData = (await getDoc(approvedAdRef)).data();
+
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: approvedAdData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 30,
+            message: "Invoice Request Approve  by FAO for selecting Undersecretary updated approved add document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog })
+        
+        
+        
+
+        //mail send to uploadSanction
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        let  toMail = usersEmailData["undersecretaryiprgmailcom"];
+       
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/directorNotesheet`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    // to: toMail,
+                    to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: approvedAdData.notesheetString,
+                    amount: approvedAdData.TotalAmount,
+                    regardsFrom:"Director",
+                    addressTo:"UnderSecretary",
+
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Approve  by FAO for selecting Undersecretary mail sent successfully to department  ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            } else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Approve  by FAO for selecting Undersecretary  mail failed to send to department ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+
+        
+
+        res.status(200).json({ success: true, message: "Invoice Request Approve  by FAO for selecting Undersecretary successfully" });
+
+
+    } catch (error: Error | any) {
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 30,
+            message: `Invoice Request Approve  by FAO for selecting Undersecretary Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
             networkip: req.ip || null,
