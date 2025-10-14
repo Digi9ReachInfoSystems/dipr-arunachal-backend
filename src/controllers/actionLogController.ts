@@ -24,6 +24,18 @@ const actionLogsRef = collection(db, "actionLogs");
 export const createActionLog = async (req: Request, res: Response) => {
   try {
     const body = req.body;
+    // console.log("body", body);
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
+    // console.log("headers", clientIp, "ip", req.ip);
+    const normalize = (val: any) =>
+      val === "null" || val === "undefined" || val === undefined || val === null || val === 100 ? null : val;
+
+    // Normalize top-level string fields
+    for (const key of Object.keys(body)) {
+      body[key] = normalize(body[key]);
+    }
+    console.log("after normalize", body);
 
     if (body.platform && !["iOS", "Android", "Web"].includes(body.platform)) {
       throw new AppError("Invalid platform type", 422, {
@@ -87,7 +99,7 @@ export const createActionLog = async (req: Request, res: Response) => {
     }
 
     const log = new ActionLog(body);
-    log.networkip = req.ip || null;
+    log.networkip =clientIp || null;
 
     const docRef = await addDoc(actionLogsRef, { ...log });
     res.status(201).json({ success: true, message: "ActionLog created", id: docRef.id });

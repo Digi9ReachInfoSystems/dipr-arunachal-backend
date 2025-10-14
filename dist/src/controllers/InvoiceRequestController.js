@@ -2580,6 +2580,9 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
 };
 export const invoiceNoteSheetRejectDeputy = async (req, res) => {
     const { approvedAdId, FeedbackDeputy, user_id, user_role, platform, screen } = req.body;
+    // console.dir(req.body, { depth: null });
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     //read document from user collection
     const userRef = doc(db, "Users", user_id);
     const userSnapshot = await getDoc(userRef);
@@ -2638,7 +2641,7 @@ export const invoiceNoteSheetRejectDeputy = async (req, res) => {
             message: "Invoice Request Reject  by Deputy updated approved add document",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -2705,7 +2708,7 @@ export const invoiceNoteSheetRejectDeputy = async (req, res) => {
                     message: `Invoice Request Rejeted  by Deputy mail sent successfully to department  ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -2733,7 +2736,7 @@ export const invoiceNoteSheetRejectDeputy = async (req, res) => {
                     message: `Invoice Request Reject  by Deputy  mail failed to send to department ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -2768,7 +2771,7 @@ export const invoiceNoteSheetRejectDeputy = async (req, res) => {
             message: `Invoice Request Reject  by Deputy Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -2791,6 +2794,8 @@ export const invoiceNoteSheetRejectDeputy = async (req, res) => {
 };
 export const invoiceNoteSheetRejectDirector = async (req, res) => {
     const { approvedAdId, feedbackDirector, user_id, user_role, platform, screen } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     //read document from user collection
     const userRef = doc(db, "Users", user_id);
     const userSnapshot = await getDoc(userRef);
@@ -2850,7 +2855,7 @@ export const invoiceNoteSheetRejectDirector = async (req, res) => {
             message: "Invoice Request Reject  by Director updated approved add document",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -2918,7 +2923,7 @@ export const invoiceNoteSheetRejectDirector = async (req, res) => {
                     message: `Invoice Request Reject  by Deputy mail sent successfully to department  ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -2946,7 +2951,7 @@ export const invoiceNoteSheetRejectDirector = async (req, res) => {
                     message: `Invoice Request Reject  by Director  mail failed to send to department ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -2981,7 +2986,7 @@ export const invoiceNoteSheetRejectDirector = async (req, res) => {
             message: `Invoice Request Reject  by Director Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3004,6 +3009,8 @@ export const invoiceNoteSheetRejectDirector = async (req, res) => {
 };
 export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
     const { approvedAdId, feedbackUnderSecretary, user_id, user_role, platform, screen } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     //read document from user collection
     const userRef = doc(db, "Users", user_id);
     const userSnapshot = await getDoc(userRef);
@@ -3064,7 +3071,7 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
             message: "Invoice Request Reject  by Under Secratory updated approved add document",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3134,7 +3141,7 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
                     message: `Invoice Request Reject  by Under Secratory mail sent successfully to department  ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3162,7 +3169,7 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
                     message: `Invoice Request Reject  by Under Secratory  mail failed to send to department ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3197,7 +3204,7 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
             message: `Invoice Request Reject  by Under Secratory Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3220,6 +3227,8 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
 };
 export const invoiceNoteSheetRejectIsSc = async (req, res) => {
     const { approvedAdId, feedbacksc, user_id, user_role, platform, screen } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     //read document from user collection
     const userRef = doc(db, "Users", user_id);
     const userSnapshot = await getDoc(userRef);
@@ -3282,7 +3291,7 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
             message: "Invoice Request Reject  by IsSc updated approved add document",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3352,7 +3361,7 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
                     message: `Invoice Request Reject  by IsSc mail sent successfully to department  ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3380,7 +3389,7 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
                     message: `Invoice Request Reject  by IsSc  mail failed to send to department ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3415,7 +3424,7 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
             message: `Invoice Request Reject  by IsSc Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3438,6 +3447,8 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
 };
 export const invoiceNoteSheetRejectFao = async (req, res) => {
     const { approvedAdId, feedbackFao, user_id, user_role, platform, screen } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     //read document from user collection
     const userRef = doc(db, "Users", user_id);
     const userSnapshot = await getDoc(userRef);
@@ -3497,7 +3508,7 @@ export const invoiceNoteSheetRejectFao = async (req, res) => {
             message: "Invoice Request Reject  by FAO updated approved add document",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3567,7 +3578,7 @@ export const invoiceNoteSheetRejectFao = async (req, res) => {
                     message: `Invoice Request Reject  by FAO mail sent successfully to department  ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3595,7 +3606,7 @@ export const invoiceNoteSheetRejectFao = async (req, res) => {
                     message: `Invoice Request Reject  by FAO  mail failed to send to department ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3630,7 +3641,7 @@ export const invoiceNoteSheetRejectFao = async (req, res) => {
             message: `Invoice Request Reject  by FAO Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3653,6 +3664,8 @@ export const invoiceNoteSheetRejectFao = async (req, res) => {
 };
 export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
     const { approvedAdId, user_id, user_role, platform, screen } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     //read document from user collection
     const userRef = doc(db, "Users", user_id);
     const userSnapshot = await getDoc(userRef);
@@ -3706,7 +3719,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
             message: "Invoice Request Approve  by FAO for selecting LDC/UDC updated approved add document",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3750,7 +3763,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
             message: "Invoice Request Approve  by FAO for selecting LDC/UDC updated admindata document",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3816,7 +3829,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
                     message: `Invoice Request Approve  by FAO for selecting LDC/UDC mail sent successfully to department  ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3844,7 +3857,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
                     message: `Invoice Request Approve  by FAO for selecting LDC/UDC  mail failed to send to department ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3893,7 +3906,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
                     message: `Invoice Request Approve  by FAO for selecting LDC/UDC mail sent successfully to department  ${toMailTwo}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3921,7 +3934,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
                     message: `Invoice Request Approve  by FAO for selecting LDC/UDC  mail failed to send to department ${toMailTwo}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -3956,7 +3969,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
             message: `Invoice Request Approve  by FAO for selecting LDC/UDC Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -3979,6 +3992,8 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
 };
 export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) => {
     const { approvedAdId, user_id, user_role, platform, screen } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     //read document from user collection
     const userRef = doc(db, "Users", user_id);
     const userSnapshot = await getDoc(userRef);
@@ -4026,7 +4041,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
             message: "Invoice Request Approve  by FAO for selecting Undersecretary updated approved add document",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -4075,7 +4090,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
                     message: `Invoice Request Approve  by FAO for selecting Undersecretary mail sent successfully to department  ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -4103,7 +4118,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
                     message: `Invoice Request Approve  by FAO for selecting Undersecretary  mail failed to send to department ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -4138,7 +4153,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
             message: `Invoice Request Approve  by FAO for selecting Undersecretary Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),

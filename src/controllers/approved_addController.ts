@@ -89,6 +89,8 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         platform,
         screen
     } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     try {
 
         //pepare userRef and get userDetails
@@ -218,7 +220,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             message: "NoteSheet Created new document created in approved_add collection",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -259,7 +261,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             message: "NoteSheet Created new document created in bugdetDetails collection",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -296,7 +298,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             message: "NoteSheet Created new document updated in adminData collection",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -335,7 +337,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             message: "NoteSheet Created new document updated in user collection",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -385,7 +387,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
                     message: `NoteSheet Created mail sent successfully to   ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -412,7 +414,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
                     message: `NoteSheet Createdmail failed to send to  ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -448,7 +450,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             message: `NoteSheet Created  Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -472,8 +474,9 @@ export const createNoteSheet = async (req: Request, res: Response) => {
 };
 
 export const uploadSanctionletter = async (req: Request, res: Response) => {
-    const { approvedAdId,sanctionLettter, user_id, user_role, platform, screen } = req.body;
-
+    const { approvedAdId, sanctionLettter, user_id, user_role, platform, screen } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     //read document from user collection
     const userRef = doc(db, "Users", user_id)
     const userSnapshot = await getDoc(userRef)
@@ -505,8 +508,8 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
         const approvedAdData = approvedAdSnapshot.data();
         //update approved_ad document
         await updateDoc(approvedAdRef, {
-           sanctionLettter:sanctionLettter,
-           accountant_status:0,
+            sanctionLettter: sanctionLettter,
+            accountant_status: 0,
 
         });
         const updatedData = (await getDoc(approvedAdRef)).data();
@@ -525,7 +528,7 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
             message: "Uploaded sanction letter  updated approved add document",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -538,15 +541,15 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
             note_sheet_allocation: approvedAdRef || null,
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLog });
-         //mail send to uploadSanction
+        //mail send to uploadSanction
         const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
         const userEmailDocSnap = usersEmailSnap.docs[0];
         if (!userEmailDocSnap) {
             throw new Error("UsersEmail document does not exist");
         }
         const usersEmailData = userEmailDocSnap.data();
-        let  toMail = usersEmailData["diprarunaccgmailcom"];
-       
+        let toMail = usersEmailData["diprarunaccgmailcom"];
+
         try {
             const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/approvalSanction`, {
                 method: "POST",
@@ -573,7 +576,7 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
                     message: `Uploaded sanction letter   mail sent successfully to department  ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -600,7 +603,7 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
                     message: `Uploaded sanction letter    mail failed to send to department ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -632,14 +635,14 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
             rodocref: null,
             ronumber: null,
             docrefinvoice: null,
-            old_data:  {},
-            edited_data:  {},
+            old_data: {},
+            edited_data: {},
             user_role,
             action: 30,
             message: `Uploaded sanction letter  Failed Error - ${error.message}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: null,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
