@@ -41,10 +41,10 @@ export const getApproveAddCount = async (req, res) => {
     }
 };
 export const createNoteSheet = async (req, res) => {
-    const { userref, approvedList, totalamount, assitantFeedback, user_id, user_role, platform, screen } = req.body;
+    const { userref, 
+    // approvedList,
+    newspaperUserId, totalamount, assitantFeedback, user_id, user_role, platform, screen } = req.body;
     try {
-        // console.log("request body", req.body);
-        console.dir(req.body, { depth: null });
         //pepare userRef and get userDetails
         const collectionData = userref.split("/");
         let UserRef = null;
@@ -65,6 +65,16 @@ export const createNoteSheet = async (req, res) => {
             });
         }
         const userData = userSnapshot.data();
+        //prepare approved list
+        const newspaperRef = doc(db, "Users", newspaperUserId);
+        const userApprovedList = userData.approvedlist || [];
+        const approvedList = userApprovedList.filter((item) => {
+            const itemRef = item.userrerf && typeof item.userrerf.path === "string"
+                ? item.userrerf
+                : null;
+            const isSame = itemRef && newspaperRef && itemRef.path === newspaperRef.path;
+            return isSame;
+        });
         //Get First Document of admindata collection to get admin Id
         const adminQuerySnap = await getDocs(collection(db, "admindata"));
         if (adminQuerySnap.empty) {
@@ -87,7 +97,7 @@ export const createNoteSheet = async (req, res) => {
         const adminRef = adminSnapshot.ref;
         // console.log("adminRef", adminRef);
         ;
-        const noteSheetNo = adminData.notesheetno;
+        const noteSheetNo = (adminData.notesheetno) + 1;
         //create document in approved_add collection
         const approved_addCollection = collection(db, "approved_add");
         const approved_addRef = doc(approved_addCollection);
@@ -123,7 +133,7 @@ export const createNoteSheet = async (req, res) => {
             FaoStatus: 10,
             statusSecretary: 10,
             dateTimeAssistant: serverTimestamp(),
-            userref: UserRef,
+            userref: newspaperRef,
             statusUnderSecretary: 10,
             notesheetdetails: [{
                     createddate: moment().tz("Asia/Kolkata").toDate(),
@@ -232,8 +242,12 @@ export const createNoteSheet = async (req, res) => {
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLogAdminData });
         //update user collection Data
+        let existingApprovedList = userData.approvedlist || [];
+        const filteredApprovedList = existingApprovedList.filter((item) => {
+            return !approvedList.some((item2) => item2.userrerf?.path === item.userrerf?.path);
+        });
         await updateDoc(UserRef, {
-            approvedlist: approvedList
+            approvedlist: filteredApprovedList
         });
         const updatedUserData = (await getDoc(UserRef)).data();
         //create action log
