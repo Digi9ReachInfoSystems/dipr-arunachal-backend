@@ -11,4 +11,9 @@ export declare const invoiceNoteSheetAcknowledgeDeputy: (req: Request, res: Resp
 export declare const invoiceNoteSheetAcknowledgeDirector: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const invoiceNoteSheetAcknowledgeUnderSecratory: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const invoiceNoteSheetAcknowledgeIsSc: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+export declare const invoiceNoteSheetRejectDeputy: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+export declare const invoiceNoteSheetRejectDirector: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+export declare const invoiceNoteSheetRejectUnderSecratory: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+export declare const invoiceNoteSheetRejectIsSc: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+export declare const invoiceNoteSheetRejectFao: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 //# sourceMappingURL=InvoiceRequestController.d.ts.map

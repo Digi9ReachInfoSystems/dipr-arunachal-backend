@@ -1,5 +1,5 @@
 import express from "express";
-import { assistantApproveInvoiceRequest, assistantSubmitInvoiceRequest, createInvoice, deputyApproveInvoiceRequestPutUp, deputyApproveInvoiceRequestSendForward, deputyInvoiceSendBack, editInvoice, getInvoiceRequestCount, invoiceNoteSheetAcknowledgeDeputy, invoiceNoteSheetAcknowledgeDirector, invoiceNoteSheetAcknowledgeIsSc, invoiceNoteSheetAcknowledgeUnderSecratory } from "../controllers/InvoiceRequestController.js";
+import { assistantApproveInvoiceRequest, assistantSubmitInvoiceRequest, createInvoice, deputyApproveInvoiceRequestPutUp, deputyApproveInvoiceRequestSendForward, deputyInvoiceSendBack, editInvoice, getInvoiceRequestCount, invoiceNoteSheetAcknowledgeDeputy, invoiceNoteSheetAcknowledgeDirector, invoiceNoteSheetAcknowledgeIsSc, invoiceNoteSheetAcknowledgeUnderSecratory, invoiceNoteSheetRejectDeputy, invoiceNoteSheetRejectDirector, invoiceNoteSheetRejectFao, invoiceNoteSheetRejectIsSc, invoiceNoteSheetRejectUnderSecratory } from "../controllers/InvoiceRequestController.js";
 
 
 
@@ -17,4 +17,9 @@ router.patch("/approve/noteSheet/byDeputy",invoiceNoteSheetAcknowledgeDeputy);
 router.patch("/approve/noteSheet/byDirector",invoiceNoteSheetAcknowledgeDirector);
 router.patch("/approve/noteSheet/byUnderSecratory",invoiceNoteSheetAcknowledgeUnderSecratory);
 router.patch("/approve/noteSheet/byIsSc",invoiceNoteSheetAcknowledgeIsSc);
+router.patch("/reject/noteSheet/byDeputy",invoiceNoteSheetRejectDeputy);
+router.patch("/reject/noteSheet/byDirector",invoiceNoteSheetRejectDirector);
+router.patch("/reject/noteSheet/byUnderSecratory",invoiceNoteSheetRejectUnderSecratory);
+router.patch("/reject/noteSheet/byIsSc",invoiceNoteSheetRejectIsSc);
+router.patch("/reject/noteSheet/byFao",invoiceNoteSheetRejectFao);
 export default router;
