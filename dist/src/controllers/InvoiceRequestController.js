@@ -4052,8 +4052,8 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    // to: toMail,
-                    to: "jayanthbr@digi9.co.in",
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
                     notesheetNumber: approvedAdData.notesheetString,
                     amount: approvedAdData.TotalAmount,
                     regardsFrom: "Director",

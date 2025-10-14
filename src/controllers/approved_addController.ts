@@ -90,7 +90,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         screen
     } = req.body;
     try {
-        
+
         //pepare userRef and get userDetails
         const collectionData = userref.split("/");
         let UserRef: DocumentReference | null = null;
@@ -128,7 +128,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
 
             return isSame;
         });
-        
+
         //Get First Document of admindata collection to get admin Id
         const adminQuerySnap = await getDocs(collection(db, "admindata"));
         if (adminQuerySnap.empty) {
@@ -154,7 +154,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         ;
 
 
-        const noteSheetNo = (adminData.notesheetno)+1;
+        const noteSheetNo = (adminData.notesheetno) + 1;
 
         //create document in approved_add collection
         const approved_addCollection = collection(db, "approved_add");
@@ -462,6 +462,196 @@ export const createNoteSheet = async (req: Request, res: Response) => {
 
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLog })
+        console.error("Error in Invoice_Request count:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch count",
+            error: error.message,
+        });
+    }
+};
+
+export const uploadSanctionletter = async (req: Request, res: Response) => {
+    const { approvedAdId,sanctionLettter, user_id, user_role, platform, screen } = req.body;
+
+    //read document from user collection
+    const userRef = doc(db, "Users", user_id)
+    const userSnapshot = await getDoc(userRef)
+    if (!userSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    const userData = userSnapshot.data();
+    if (!userData) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+
+    //read document from approve_add collection
+    const approvedAdRef = doc(db, "approved_add", approvedAdId)
+    try {
+
+        const approvedAdSnapshot = await getDoc(approvedAdRef)
+        if (!approvedAdSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved Ad not found",
+            });
+        }
+        const approvedAdData = approvedAdSnapshot.data();
+        //update approved_ad document
+        await updateDoc(approvedAdRef, {
+           sanctionLettter:sanctionLettter,
+           accountant_status:0,
+
+        });
+        const updatedData = (await getDoc(approvedAdRef)).data();
+
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: approvedAdData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 31,
+            message: "Uploaded sanction letter  updated approved add document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+         //mail send to uploadSanction
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        let  toMail = usersEmailData["diprarunaccgmailcom"];
+       
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/approvalSanction`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: approvedAdData.notesheetString,
+
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Uploaded sanction letter   mail sent successfully to department  ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            } else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Uploaded sanction letter    mail failed to send to department ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+
+
+
+        res.status(200).json({ success: true, message: "Sanction letter uploaded successfully" });
+
+    } catch (error: Error | any) {
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data:  {},
+            edited_data:  {},
+            user_role,
+            action: 30,
+            message: `Uploaded sanction letter  Failed Error - ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
         console.error("Error in Invoice_Request count:", error);
         res.status(500).json({
             success: false,
