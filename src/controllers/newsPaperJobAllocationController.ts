@@ -39,6 +39,8 @@ interface VendorNotification {
 }
 
 export const updateApproveCvAndTimeAllotment = async (req: Request, res: Response) => {
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     try {
         const { documentIds, addressTo, to, advertisementNumber } = req.body as {
             documentIds: string[];
@@ -374,6 +376,8 @@ export const getNewspaperJobAllocationsCountByUser = async (req: Request, res: R
 
 export const approveNewspaperJobAllocationByVendor = async (req: Request, res: Response) => {
     const { JobApplicationId, user_ref, user_role, platform, screen } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     if (!JobApplicationId) {
         return res.status(400).json({
             success: false,
@@ -426,7 +430,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
             message: "Approved Newspaper Job Allocation ",
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: data.adref,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -520,7 +524,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
                     message: `Vendor Approve Release Order mail sent successfully to department ${toMail}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -545,7 +549,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
                     message: `Vendor Approve Release Order mail failed to send to department ${toMail}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -594,7 +598,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
                     message: `Vendor Approve Release Order mail sent successfully to department ${data.Bearingno}`,
                     status: "Success",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -619,7 +623,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
                     message: `Vendor Approve Release Order mail failed to send to department ${data.Bearingno}`,
                     status: "Failed",
                     platform: platform,
-                    networkip: req.ip || null,
+                    networkip: clientIp || null,
                     screen,
                     Newspaper_allocation: {
                         Newspaper: [],
@@ -660,7 +664,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
             message: "Failed to approve Newspaper Job Allocation by Vendor",
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: data.adref,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -683,6 +687,8 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
 
 export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Response) => {
     const { JobApplicationId, rejectReason, user_ref, user_role, platform, screen } = req.body;
+    const xForwardedFor = req.headers["x-forwarded-for"];
+    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     if (!JobApplicationId) {
         return res.status(400).json({
             success: false,
@@ -797,7 +803,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                         message: `Vendor Reject Release Order mail sent successfully to department ${toMail}`,
                         status: "Success",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -822,7 +828,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                         message: `Vendor Reject Release Order mail failed to send to department ${toMail}`,
                         status: "Failed",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -874,7 +880,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                         message: `Vendor Reject Release Order mail sent successfully to department ${toMailTwo}`,
                         status: "Success",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -899,7 +905,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                         message: `Vendor Reject Release Order mail failed to send to department ${toMailTwo}`,
                         status: "Failed",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -996,7 +1002,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                 message: "Automatic allocation successful sent to newspapers",
                 status: "Success",
                 platform: platform,
-                networkip: req.ip || null,
+                networkip: clientIp || null,
                 screen,
                 Newspaper_allocation: {
                     Newspaper: newAllotedNewsPaper as unknown as DocumentReference<DocumentData>[],
@@ -1038,16 +1044,16 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                     const actionLog = new ActionLog({
                         user_ref: user_ref ? doc(db, "Users", user_ref) : null,
                         islogin: false,
-                        rodocref:newNewsPaperJobAllocationRef, // each allocation doc ref
+                        rodocref: newNewsPaperJobAllocationRef, // each allocation doc ref
                         ronumber: `DIPR/ARN/${ronumbers}`,
                         old_data: {},
                         edited_data: {},
                         user_role,
                         action: 10,
-                        message: `Manual Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${ newNewsPaper.email}`,
+                        message: `Manual Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${newNewsPaper.email}`,
                         status: "Success",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -1063,16 +1069,16 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                     const actionLog = new ActionLog({
                         user_ref: user_ref ? doc(db, "Users", user_ref) : null,
                         islogin: false,
-                        rodocref:newNewsPaperJobAllocationRef, // each allocation doc ref
-                        ronumber:  `DIPR/ARN/${ronumbers}`,
+                        rodocref: newNewsPaperJobAllocationRef, // each allocation doc ref
+                        ronumber: `DIPR/ARN/${ronumbers}`,
                         old_data: {},
                         edited_data: {},
                         user_role,
                         action: 10,
-                        message: `Manual Allocation sent  to newspaper mail sent to vendors Failed to mail id ${newNewsPaper.email } `,
+                        message: `Manual Allocation sent  to newspaper mail sent to vendors Failed to mail id ${newNewsPaper.email} `,
                         status: "Failed",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -1121,7 +1127,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                         message: `Vendor Reject Release Order mail sent successfully to department ${toMail}`,
                         status: "Success",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -1146,7 +1152,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                         message: `Vendor Reject Release Order mail failed to send to department ${toMail}`,
                         status: "Failed",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -1198,7 +1204,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                         message: `Vendor Reject Release Order mail sent successfully to department ${toMailTwo}`,
                         status: "Success",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -1223,7 +1229,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                         message: `Vendor Reject Release Order mail failed to send to department ${toMailTwo}`,
                         status: "Failed",
                         platform: platform,
-                        networkip: req.ip || null,
+                        networkip: clientIp || null,
                         screen,
                         Newspaper_allocation: {
                             Newspaper: [],
@@ -1267,7 +1273,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
             message: `NewspaperJobAllocation rejected successfully by vendor`,
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: data.adref,
             actiontime: moment().tz("Asia/Kolkata").toDate(),
@@ -1300,7 +1306,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
             message: `NewspaperJobAllocation rejected failed by vendor ${error}`,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen: screen,
             adRef: data.adref,
             actiontime: moment().tz("Asia/Kolkata").toDate(),

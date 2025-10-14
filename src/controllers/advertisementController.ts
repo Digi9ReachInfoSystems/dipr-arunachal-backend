@@ -40,9 +40,11 @@ interface VendorNotification {
   roNumber: string;
   result: string;
   resultComment: string;
-   allocationRef: DocumentReference;
+  allocationRef: DocumentReference;
 }
 export const createAdvertisement = async (req: Request, res: Response) => {
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
   try {
 
 
@@ -121,7 +123,7 @@ export const createAdvertisement = async (req: Request, res: Response) => {
       message: `Advertisement created with ID ${docRef.id}`,
       status: "Success",
       platform: req.body.platform,
-      networkip: req.ip || null,
+      networkip: clientIp || null,
       screen: req.body.screen,
       Newspaper_allocation: {
         Newspaper: [],
@@ -157,7 +159,7 @@ export const createAdvertisement = async (req: Request, res: Response) => {
       message: `Error in createReleaseOrder: ${error}`,
       status: "Failed",
       platform: req.body.platform,
-      networkip: req.ip || null,
+      networkip: clientIp || null,
       screen: req.body.screen,
       Newspaper_allocation: {
         Newspaper: [],
@@ -196,6 +198,8 @@ export const getAdvertisementById = async (req: Request, res: Response) => {
 
 export const editAdvertisement = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
   try {
 
 
@@ -253,7 +257,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       if (req.body[field] !== 'null') {
         if (Array.isArray(req.body[field]) && req.body[field]?.length > 0) {
           updatePayload[field] = req.body[field];
-        } else if (typeof req.body[field] === 'string'&&(req.body[field] !== 'null')) {
+        } else if (typeof req.body[field] === 'string' && (req.body[field] !== 'null')) {
           updatePayload[field] = req.body[field];
         }
       }
@@ -311,7 +315,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       message: `Advertisement edited with ID ${docRef.id}`,
       status: "Success",
       platform: req.body.platform,
-      networkip: req.ip || null,
+      networkip: clientIp || null,
       screen: req.body.screen,
       Newspaper_allocation: {
         Newspaper: [],
@@ -346,7 +350,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       message: `Advertisement edit failed with ID ${id}`,
       status: "Failed",
       platform: req.body.platform,
-      networkip: req.ip || null,
+      networkip: clientIp || null,
       screen: req.body.screen,
       Newspaper_allocation: {
         Newspaper: [],
@@ -586,6 +590,8 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
   let editedData: any = {};
   const networkip = req.ip || null;
   let successAllocations: { ref: DocumentReference; payload: any }[] = [];
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
 
   if (!advertisementId || !numOfVendors) {
     throw new Error("Missing required parameters: advertisementId or numOfVendors");
@@ -718,7 +724,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
             message: `Automatic Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${mail.to}`,
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen,
             Newspaper_allocation: {
               Newspaper: [],
@@ -743,7 +749,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
             message: `Automatic Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} `,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen,
             Newspaper_allocation: {
               Newspaper: [],
@@ -791,7 +797,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
           message: `Automatic Allocation sent  to newspaper mail sent to department Successfully to mail id ${to}`,
           status: "Success",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -816,7 +822,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
           message: `Automatic Allocation sent  to newspaper mail sent to department Failed to mail id ${to}`,
           status: "Failed",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -854,7 +860,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
         message: "Automatic allocation successful sent to newspapers",
         status: "Success",
         platform: platform,
-        networkip: req.ip || null,
+        networkip: clientIp || null,
         screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers as unknown as DocumentReference<DocumentData>[],
@@ -896,7 +902,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
         message: `Automatic allocation sent to newspapers failed: ${error.message}`,
         status: "Failed",
         platform: req.body.platform,
-        networkip,
+        networkip: clientIp || null,
         screen: req.body.screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers as unknown as DocumentReference<DocumentData>[],
@@ -923,6 +929,8 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
   let editedData: any = {};
   const networkip = req.ip || null;
   let successAllocations: { ref: DocumentReference; payload: any }[] = [];
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
 
   if (!advertisementId || !allotedNewspapers || allotedNewspapers.length === 0) {
     throw new Error("Missing required parameters: advertisementId  or allotedNewspapers");
@@ -1089,7 +1097,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
             message: `Manual Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${mail.to}`,
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen,
             Newspaper_allocation: {
               Newspaper: [],
@@ -1114,7 +1122,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
             message: `Manual Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} `,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen,
             Newspaper_allocation: {
               Newspaper: [],
@@ -1163,7 +1171,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
           message: `Manual Allocation sent  to newspaper mail sent to department Successfully to mail id ${to}`,
           status: "Success",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -1188,7 +1196,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
           message: `Manual Allocation sent  to newspaper mail sent to department Failed to mail id ${to}`,
           status: "Failed",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -1226,7 +1234,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
         message: "Manual allocation successful sent to newspapers",
         status: "Success",
         platform: platform,
-        networkip,
+        networkip: clientIp || null,
         screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers as unknown as DocumentReference<DocumentData>[],
@@ -1268,7 +1276,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
         message: `Manual allocation failed sent to newspapers: ${error.message}`,
         status: "Failed",
         platform: req.body.platform,
-        networkip,
+        networkip: clientIp || null,
         screen: req.body.screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers as unknown as DocumentReference<DocumentData>[],
@@ -1296,6 +1304,8 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
   let editedData: any = {};
   const networkip = req.ip || null;
   let successAllocations: { ref: DocumentReference; payload: any }[] = [];
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
 
   if (!advertisementId || !numOfVendors) {
     throw new Error("Missing required parameters: advertisementId or numOfVendors");
@@ -1470,7 +1480,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
           message: `Automatic Allocation sent  to Deputy Director mail sent to department Successfully to mail id ${to}`,
           status: "Success",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -1495,7 +1505,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
           message: `Automatic Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to}`,
           status: "Failed",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -1533,7 +1543,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
         message: "Automatic allocation successful and send to deputy",
         status: "Success",
         platform: platform,
-        networkip,
+        networkip: clientIp || null,
         screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers,
@@ -1575,7 +1585,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
         message: `Automatic allocation send to deputy failed: ${error.message}`,
         status: "Failed",
         platform: req.body.platform,
-        networkip,
+        networkip: clientIp || null,
         screen: req.body.screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers,
@@ -1604,7 +1614,8 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
   let editedData: any = {};
   const networkip = req.ip || null;
   let successAllocations: { ref: DocumentReference; payload: any }[] = [];
-
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
   if (!advertisementId || !allotedNewspapers || allotedNewspapers.length === 0) {
     throw new Error("Missing required parameters: advertisementId  or allotedNewspapers");
   }
@@ -1790,7 +1801,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
           message: `Manual Allocation sent  to Deputy Director mail sent to department Successfully to mail id ${to}`,
           status: "Success",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -1815,7 +1826,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
           message: `Manual Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to}`,
           status: "Failed",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -1853,7 +1864,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
         message: "Manual allocation successful sent to deputy",
         status: "Success",
         platform: platform,
-        networkip,
+        networkip: clientIp || null,
         screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers,
@@ -1895,7 +1906,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
         message: `Manual allocation failed sent to deputy: ${error.message}`,
         status: "Failed",
         platform: req.body.platform,
-        networkip,
+        networkip: clientIp || null,
         screen: req.body.screen,
         Newspaper_allocation: {
           Newspaper: allotednewspapers,
@@ -1938,6 +1949,8 @@ function wrapText(text: string, font: any, fontSize: number, maxWidth: number) {
  * Generate Advertisement PDF report for a given date range
  */
 export const generateAdvertisementReport = async (req: Request, res: Response) => {
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
   try {
     const { fromDate, toDate } = req.body;
     if (!fromDate || !toDate) {
@@ -1947,7 +1960,7 @@ export const generateAdvertisementReport = async (req: Request, res: Response) =
     // Fetch advertisements in the range
     const fromTs = Timestamp.fromDate(new Date(fromDate));
     const toTs = Timestamp.fromDate(new Date(toDate));
-    console.log("fromTs", fromTs, "toTs", toTs);
+    // console.log("fromTs", fromTs, "toTs", toTs);
 
     const adsSnapshot = await getDocs(collection(db, "Advertisement"));
     const ads = adsSnapshot.docs
@@ -2159,6 +2172,8 @@ export const getAdvertisementCountByYear = async (req: Request, res: Response) =
 export const deputyApproveAdvertisement = async (req: Request, res: Response) => {
   const { advertisementId, user_ref, user_role, platform, screen, } = req.body;
   const adRef = doc(db, "Advertisement", advertisementId);
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
 
   try {
     const ad = await getDoc(adRef);
@@ -2192,7 +2207,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
       message: `Advertisement approved by Deputy`,
       status: "Success",
       platform: req.body.platform,
-      networkip: req.ip || null,
+      networkip: clientIp || null,
       screen: req.body.screen,
       Newspaper_allocation: {
         Newspaper: [],
@@ -2242,7 +2257,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
         message: `Advertisement approved by Deputy`,
         status: "Success",
         platform: req.body.platform,
-        networkip: req.ip || null,
+        networkip: clientIp || null,
         screen: req.body.screen,
         Newspaper_allocation: {
           Newspaper: [],
@@ -2315,7 +2330,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
             message: `Deputy Approve Advertisement mail sent to vendors Successfully to mail id ${mail.to}`,
             status: "Success",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen,
             Newspaper_allocation: {
               Newspaper: [],
@@ -2340,7 +2355,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
             message: `Deputy Approve Advertisement mail sent to vendors Failed to mail id ${mail.to} `,
             status: "Failed",
             platform: platform,
-            networkip: req.ip || null,
+            networkip: clientIp || null,
             screen,
             Newspaper_allocation: {
               Newspaper: [],
@@ -2371,7 +2386,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
 
       for (const mail of notificationApproved) {
         try {
-          const response=await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
+          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -2381,58 +2396,58 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
               resultComment: mail.resultComment,
             }),
           });
-              if (response.status == 200) {
-          //create action log for mail sent
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: mail.allocationRef, // each allocation doc ref
-            ronumber: mail.roNumber,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 10,
-            message: `Deputy Approve Advertisement Accepting email  sent to vendors Successfully to mail id ${toMail}`,
-            status: "Success",
-            platform: platform,
-            networkip: req.ip || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-          });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-        } else {
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: mail.allocationRef, // each allocation doc ref
-            ronumber: mail.roNumber,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 10,
-            message: `Deputy Approve Advertisement Accepting email  sent to vendors Failed to mail id ${toMail} `,
-            status: "Failed",
-            platform: platform,
-            networkip: req.ip || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-          });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-        }
+          if (response.status == 200) {
+            //create action log for mail sent
+            const actionLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: mail.allocationRef, // each allocation doc ref
+              ronumber: mail.roNumber,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 10,
+              message: `Deputy Approve Advertisement Accepting email  sent to vendors Successfully to mail id ${toMail}`,
+              status: "Success",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
+            });
+            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+          } else {
+            const actionLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: mail.allocationRef, // each allocation doc ref
+              ronumber: mail.roNumber,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 10,
+              message: `Deputy Approve Advertisement Accepting email  sent to vendors Failed to mail id ${toMail} `,
+              status: "Failed",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
+            });
+            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+          }
           console.log(`Accepting email sent to ${toMail} for RO ${mail.roNumber}`);
         } catch (err: any) {
           console.error(`Failed to send accepting email to ${toMail}:`, err.message);
@@ -2442,7 +2457,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
 
     // Send mail to department
     try {
-      const response =await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2454,7 +2469,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
           listOfNewspapers: newsPaperList,
         }),
       });
-       if (response.status == 200) {
+      if (response.status == 200) {
         //create action log for mail sent
         const actionLog = new ActionLog({
           user_ref: user_ref ? doc(db, "Users", user_ref) : null,
@@ -2468,7 +2483,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
           message: `Deputy Approve Advertisementsent mail to department Successfully to mail id ${data.Bearingno}`,
           status: "Success",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -2493,7 +2508,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
           message: `Deputy Approve Advertisement mail sent to department Failed to mail id ${data.Bearingno}`,
           status: "Failed",
           platform: platform,
-          networkip: req.ip || null,
+          networkip: clientIp || null,
           screen,
           Newspaper_allocation: {
             Newspaper: [],
@@ -2526,7 +2541,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
       message: `Error while approving advertisement: ${error.message}`,
       status: "Failed",
       platform: req.body.platform,
-      networkip: req.ip || null,
+      networkip: clientIp || null,
       screen: req.body.screen,
       Newspaper_allocation: {
         Newspaper: [],
@@ -2546,6 +2561,8 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
 export const deputyPullBackAction = async (req: Request, res: Response) => {
   const { advertisementId, user_ref, user_role, platform, screen } = req.body;
   const adRef = doc(db, "Advertisement", advertisementId);
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
   try {
     const ad = await getDoc(adRef);
     if (!ad.exists()) {
@@ -2575,7 +2592,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
       message: `PullBack operation performed by Deputy on advertisement: ${advertisementId}`,
       status: "Success",
       platform: req.body.platform,
-      networkip: req.ip || null,
+      networkip: clientIp || null,
       screen: req.body.screen,
       Newspaper_allocation: {
         Newspaper: [],
@@ -2623,7 +2640,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
         message: `PullBack operation performed by Deputy on advertisement: ${advertisementId} and NewspaperJobAllocation: ${docRef.id}`,
         status: "Success",
         platform: req.body.platform,
-        networkip: req.ip || null,
+        networkip: clientIp || null,
         screen: req.body.screen,
         Newspaper_allocation: {
           Newspaper: [],
@@ -2657,7 +2674,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
       message: `Error while performing PullBack operation performed by Deputy on advertisement: ${error.message}`,
       status: "Failed",
       platform: req.body.platform,
-      networkip: req.ip || null,
+      networkip: clientIp || null,
       screen: req.body.screen,
       Newspaper_allocation: {
         Newspaper: [],
