@@ -2090,7 +2090,7 @@ export const invoiceNoteSheetAcknowledgeUnderSecratory = async (req, res) => {
             dateofAproval: serverTimestamp(),
             statusUnderSecretary: 2,
             datetimeUnderSeceretary: serverTimestamp(),
-            feedbackDirector: feedbackUnderSecretary,
+            feedbackUnderSecretary: feedbackUnderSecretary,
             statusSecretary: 0,
             notesheetdetails: notesheetdetails
         });
@@ -2378,8 +2378,8 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    // to: toMail,
-                    to: "jayanthbr@digi9.co.in",
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
                     notesheetNumber: approvedAdData.notesheetString,
                     amount: approvedAdData.TotalAmount,
                     cc: "dyauniprgmailcom,faoiprgmailcom"
@@ -2462,7 +2462,7 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
             default:
                 toMailTwo = usersEmailData["udc2iprgmailcom"];
         }
-        if (!toMail) {
+        if (!toMailTwo) {
             return res.status(404).json({
                 success: false,
                 message: "Email not found",
@@ -2474,8 +2474,8 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    // to: toMailTwo,
-                    to: "jayanthbr@digi9.co.in",
+                    to: toMailTwo,
+                    // to: "jayanthbr@digi9.co.in",
                     notesheetNumber: approvedAdData.notesheetString,
                 }),
             });
@@ -2555,6 +2555,1079 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
             user_role,
             action: 22,
             message: `Invoice Request Approve  by IsSc Failed Error: ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+export const invoiceNoteSheetRejectDeputy = async (req, res) => {
+    const { approvedAdId, FeedbackDeputy, user_id, user_role, platform, screen } = req.body;
+    //read document from user collection
+    const userRef = doc(db, "Users", user_id);
+    const userSnapshot = await getDoc(userRef);
+    if (!userSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    const userData = userSnapshot.data();
+    if (!userData) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    //read document from approve_add collection
+    const approvedAdRef = doc(db, "approved_add", approvedAdId);
+    try {
+        const approvedAdSnapshot = await getDoc(approvedAdRef);
+        if (!approvedAdSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved Ad not found",
+            });
+        }
+        const approvedAdData = approvedAdSnapshot.data();
+        let notesheetdetails = approvedAdData.notesheetdetails || [];
+        notesheetdetails.push({
+            createddate: moment().tz("Asia/Kolkata").toDate(),
+            feedback: FeedbackDeputy,
+            userrole: userData.display_name
+        });
+        //update approved_ad document
+        await updateDoc(approvedAdRef, {
+            deputyStatus: 0,
+            FeedbackDeputy: FeedbackDeputy,
+            dateofAproval: serverTimestamp(),
+            dateTimeDD: serverTimestamp(),
+            ispending: false,
+            assitantStattus: 1,
+            notesheetdetails: notesheetdetails
+        });
+        const updatedData = (await getDoc(approvedAdRef)).data();
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: approvedAdData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 23,
+            message: "Invoice Request Reject  by Deputy updated approved add document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        //mail send to fao
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        let toMail = '';
+        switch ((userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "") {
+            case "Arun Bhoomi":
+            case "Eastern Sentinel":
+            case "The Arunachal Times":
+            case "The Arunachal Pioneer":
+            case "The Dawn Lit Post":
+                toMail = usersEmailData["Idciprarungmailcom"];
+                break;
+            case "Arunachal front":
+                toMail = usersEmailData["udciprgmailcom"];
+                break;
+            default:
+                toMail = usersEmailData["udc2iprgmailcom"];
+        }
+        if (!toMail) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found",
+            });
+        }
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/notesheetRejected`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: approvedAdData.notesheetString,
+                    addressTo: "Deputy Director"
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Rejeted  by Deputy mail sent successfully to department  ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Reject  by Deputy  mail failed to send to department ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+        res.status(200).json({ success: true, message: "Invoice Reject Approve  by Deputy successfully" });
+    }
+    catch (error) {
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 23,
+            message: `Invoice Request Reject  by Deputy Failed Error: ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+export const invoiceNoteSheetRejectDirector = async (req, res) => {
+    const { approvedAdId, feedbackDirector, user_id, user_role, platform, screen } = req.body;
+    //read document from user collection
+    const userRef = doc(db, "Users", user_id);
+    const userSnapshot = await getDoc(userRef);
+    if (!userSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    const userData = userSnapshot.data();
+    if (!userData) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    //read document from approve_add collection
+    const approvedAdRef = doc(db, "approved_add", approvedAdId);
+    try {
+        const approvedAdSnapshot = await getDoc(approvedAdRef);
+        if (!approvedAdSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved Ad not found",
+            });
+        }
+        const approvedAdData = approvedAdSnapshot.data();
+        let notesheetdetails = approvedAdData.notesheetdetails || [];
+        notesheetdetails.push({
+            createddate: moment().tz("Asia/Kolkata").toDate(),
+            feedback: feedbackDirector,
+            userrole: userData.display_name
+        });
+        //update approved_ad document
+        await updateDoc(approvedAdRef, {
+            directorStatus: 10,
+            feedbackDirector: feedbackDirector,
+            dateofAproval: serverTimestamp(),
+            datetimeDirector: serverTimestamp(),
+            deputyStatus: 0,
+            ispending: false,
+            assitantStattus: 1,
+            notesheetdetails: notesheetdetails
+        });
+        const updatedData = (await getDoc(approvedAdRef)).data();
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: approvedAdData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 24,
+            message: "Invoice Request Reject  by Director updated approved add document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        //mail send to department
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        let toMail = '';
+        switch ((userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "") {
+            case "Arun Bhoomi":
+            case "Eastern Sentinel":
+            case "The Arunachal Times":
+            case "The Arunachal Pioneer":
+            case "The Dawn Lit Post":
+                toMail = usersEmailData["Idciprarungmailcom"];
+                break;
+            case "Arunachal front":
+                toMail = usersEmailData["udciprgmailcom"];
+                break;
+            default:
+                toMail = usersEmailData["udc2iprgmailcom"];
+        }
+        if (!toMail) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found",
+            });
+        }
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/notesheetRejected`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: approvedAdData.notesheetString,
+                    cc: usersEmailData["ddipradvtgmailcom"],
+                    addressTo: "FAO",
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Reject  by Deputy mail sent successfully to department  ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Reject  by Director  mail failed to send to department ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+        res.status(200).json({ success: true, message: "Invoice Request Reject  by Director successfully" });
+    }
+    catch (error) {
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 24,
+            message: `Invoice Request Reject  by Director Failed Error: ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
+    const { approvedAdId, feedbackUnderSecretary, user_id, user_role, platform, screen } = req.body;
+    //read document from user collection
+    const userRef = doc(db, "Users", user_id);
+    const userSnapshot = await getDoc(userRef);
+    if (!userSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    const userData = userSnapshot.data();
+    if (!userData) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    //read document from approve_add collection
+    const approvedAdRef = doc(db, "approved_add", approvedAdId);
+    try {
+        const approvedAdSnapshot = await getDoc(approvedAdRef);
+        if (!approvedAdSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved Ad not found",
+            });
+        }
+        const approvedAdData = approvedAdSnapshot.data();
+        let notesheetdetails = approvedAdData.notesheetdetails || [];
+        notesheetdetails.push({
+            createddate: moment().tz("Asia/Kolkata").toDate(),
+            feedback: feedbackUnderSecretary,
+            userrole: userData.display_name
+        });
+        //update approved_ad document
+        await updateDoc(approvedAdRef, {
+            deputyStatus: 0,
+            directorStatus: 10,
+            FaoStatus: 10,
+            ispending: false,
+            assitantStattus: 1,
+            statusUnderSecretary: 10,
+            datetimeUnderSeceretary: serverTimestamp(),
+            feedbackUnderSecretary: feedbackUnderSecretary,
+            notesheetdetails: notesheetdetails
+        });
+        const updatedData = (await getDoc(approvedAdRef)).data();
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: approvedAdData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 26,
+            message: "Invoice Request Reject  by Under Secratory updated approved add document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        //mail send to department
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        const toMail = usersEmailData["dyauniprgmailcom"];
+        let thirdCC = ``;
+        switch ((userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "") {
+            case "Arun Bhoomi":
+            case "Eastern Sentinel":
+            case "The Arunachal Times":
+            case "The Arunachal Pioneer":
+            case "The Dawn Lit Post":
+                thirdCC = usersEmailData["Idciprarungmailcom"];
+                break;
+            case "Arunachal front":
+                thirdCC = usersEmailData["udciprgmailcom"];
+                break;
+            default:
+                thirdCC = usersEmailData["udc2iprgmailcom"];
+        }
+        if (!thirdCC) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found",
+            });
+        }
+        const cc = `${usersEmailData["faoiprgmailcom"]},${usersEmailData["ddipradvtgmailcom"]},${thirdCC}`;
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/notesheetRejected`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: approvedAdData.notesheetString,
+                    cc: cc,
+                    addressTo: "UnderSecretary",
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Reject  by Under Secratory mail sent successfully to department  ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Reject  by Under Secratory  mail failed to send to department ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+        res.status(200).json({ success: true, message: "Invoice Request Reject  by Under Secratory successfully" });
+    }
+    catch (error) {
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 26,
+            message: `Invoice Request Reject  by Under Secratory Failed Error: ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+export const invoiceNoteSheetRejectIsSc = async (req, res) => {
+    const { approvedAdId, feedbacksc, user_id, user_role, platform, screen } = req.body;
+    //read document from user collection
+    const userRef = doc(db, "Users", user_id);
+    const userSnapshot = await getDoc(userRef);
+    if (!userSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    const userData = userSnapshot.data();
+    if (!userData) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    //read document from approve_add collection
+    const approvedAdRef = doc(db, "approved_add", approvedAdId);
+    try {
+        const approvedAdSnapshot = await getDoc(approvedAdRef);
+        if (!approvedAdSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved Ad not found",
+            });
+        }
+        const approvedAdData = approvedAdSnapshot.data();
+        let notesheetdetails = approvedAdData.notesheetdetails || [];
+        notesheetdetails.push({
+            createddate: moment().tz("Asia/Kolkata").toDate(),
+            feedback: feedbacksc,
+            userrole: userData.display_name
+        });
+        //update approved_ad document
+        await updateDoc(approvedAdRef, {
+            statusSecretary: 10,
+            feedbacksc: feedbacksc,
+            dateofAproval: serverTimestamp(),
+            datetimeSc: serverTimestamp(),
+            deputyStatus: 0,
+            directorStatus: 10,
+            FaoStatus: 10,
+            ispending: false,
+            assitantStattus: 1,
+            statusUnderSecretary: 10,
+            notesheetdetails: notesheetdetails
+        });
+        const updatedData = (await getDoc(approvedAdRef)).data();
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: approvedAdData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 27,
+            message: "Invoice Request Reject  by IsSc updated approved add document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        //mail send to department - approvedTFao
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        const toMail = usersEmailData["undersecretaryiprgmailcom"];
+        let thirdCC = ``;
+        switch ((userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "") {
+            case "Arun Bhoomi":
+            case "Eastern Sentinel":
+            case "The Arunachal Times":
+            case "The Arunachal Pioneer":
+            case "The Dawn Lit Post":
+                thirdCC = usersEmailData["Idciprarungmailcom"];
+                break;
+            case "Arunachal front":
+                thirdCC = usersEmailData["udciprgmailcom"];
+                break;
+            default:
+                thirdCC = usersEmailData["udc2iprgmailcom"];
+        }
+        if (!thirdCC) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found",
+            });
+        }
+        const cc = `${usersEmailData["faoiprgmailcom"]},${usersEmailData["ddipradvtgmailcom"]},${thirdCC}`;
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/notesheetRejected`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: approvedAdData.notesheetString,
+                    cc: cc,
+                    addressTo: "Secretary"
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Reject  by IsSc mail sent successfully to department  ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Reject  by IsSc  mail failed to send to department ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+        res.status(200).json({ success: true, message: "Invoice Request Rejected  by IsSc successfully" });
+    }
+    catch (error) {
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 27,
+            message: `Invoice Request Reject  by IsSc Failed Error: ${error.message}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        console.error("❌ Error updating invoice:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: error.message,
+        });
+    }
+};
+export const invoiceNoteSheetRejectFao = async (req, res) => {
+    const { approvedAdId, feedbackFao, user_id, user_role, platform, screen } = req.body;
+    //read document from user collection
+    const userRef = doc(db, "Users", user_id);
+    const userSnapshot = await getDoc(userRef);
+    if (!userSnapshot.exists()) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    const userData = userSnapshot.data();
+    if (!userData) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+    //read document from approve_add collection
+    const approvedAdRef = doc(db, "approved_add", approvedAdId);
+    try {
+        const approvedAdSnapshot = await getDoc(approvedAdRef);
+        if (!approvedAdSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Approved Ad not found",
+            });
+        }
+        const approvedAdData = approvedAdSnapshot.data();
+        let notesheetdetails = approvedAdData.notesheetdetails || [];
+        notesheetdetails.push({
+            createddate: moment().tz("Asia/Kolkata").toDate(),
+            feedback: feedbackFao,
+            userrole: userData.display_name
+        });
+        //update approved_ad document
+        await updateDoc(approvedAdRef, {
+            FaoStatus: 10,
+            feedbackFao: feedbackFao,
+            dateofAproval: serverTimestamp(),
+            datetimeFao: serverTimestamp(),
+            deputyStatus: 0,
+            directorStatus: 10,
+            assitantStattus: 1,
+            notesheetdetails: notesheetdetails
+        });
+        const updatedData = (await getDoc(approvedAdRef)).data();
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: approvedAdData || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 27,
+            message: "Invoice Request Reject  by FAO updated approved add document",
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        //mail send to department - approvedTFao
+        const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+        const userEmailDocSnap = usersEmailSnap.docs[0];
+        if (!userEmailDocSnap) {
+            throw new Error("UsersEmail document does not exist");
+        }
+        const usersEmailData = userEmailDocSnap.data();
+        const toMail = usersEmailData["faoiprgmailcom"];
+        let thirdCC = ``;
+        switch ((userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "") {
+            case "Arun Bhoomi":
+            case "Eastern Sentinel":
+            case "The Arunachal Times":
+            case "The Arunachal Pioneer":
+            case "The Dawn Lit Post":
+                thirdCC = usersEmailData["Idciprarungmailcom"];
+                break;
+            case "Arunachal front":
+                thirdCC = usersEmailData["udciprgmailcom"];
+                break;
+            default:
+                thirdCC = usersEmailData["udc2iprgmailcom"];
+        }
+        if (!thirdCC) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found",
+            });
+        }
+        const cc = `${usersEmailData["ddipradvtgmailcom"]},${thirdCC}`;
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/notesheetRejected`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: toMail,
+                    // to: "jayanthbr@digi9.co.in",
+                    notesheetNumber: approvedAdData.notesheetString,
+                    cc: cc,
+                    addressTo: "Director"
+                }),
+            });
+            if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Reject  by FAO mail sent successfully to department  ${toMail}`,
+                    status: "Success",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+            else {
+                const actionLog = new ActionLog({
+                    user_ref: user_id ? doc(db, "Users", user_id) : null,
+                    islogin: false,
+                    rodocref: null, // each allocation doc ref
+                    ronumber: null,
+                    docrefinvoice: null,
+                    old_data: {},
+                    edited_data: {},
+                    user_role,
+                    action: 10,
+                    message: `Invoice Request Reject  by FAO  mail failed to send to department ${toMail}`,
+                    status: "Failed",
+                    platform: platform,
+                    networkip: req.ip || null,
+                    screen,
+                    Newspaper_allocation: {
+                        Newspaper: [],
+                        allotedtime: null,
+                        allocation_type: null,
+                        allotedby: null,
+                    },
+                    adRef: null,
+                    actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    note_sheet_allocation: approvedAdRef || null,
+                });
+                const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            }
+        }
+        catch (error) {
+            console.error("Error sending email:", error);
+        }
+        res.status(200).json({ success: true, message: "Invoice Request Rejected  by FAO successfully" });
+    }
+    catch (error) {
+        //create action log
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 27,
+            message: `Invoice Request Reject  by FAO Failed Error: ${error.message}`,
             status: "Failed",
             platform: platform,
             networkip: req.ip || null,
