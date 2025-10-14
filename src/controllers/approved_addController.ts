@@ -89,6 +89,8 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         screen
     } = req.body;
     try {
+        // console.log("request body", req.body);
+        console.dir(req.body,{depth: null});
         //pepare userRef and get userDetails
         const collectionData = userref.split("/");
         let UserRef: DocumentReference | null = null;
