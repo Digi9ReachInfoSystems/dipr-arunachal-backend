@@ -5,6 +5,7 @@ import {
     createAdvertisement,
     deputyApproveAdvertisement,
     deputyPullBackAction,
+    deputyRejectAdvertisement,
     editAdvertisement,
     generateAdvertisementReport,
     getAdvertisementById,
@@ -26,4 +27,5 @@ router.post("/advertisement/pdf-report", generateAdvertisementReport);
 router.get("/stats/advertisement/count/year/:year", getAdvertisementCountByYear);
 router.post("/approve/advertisement/deputy", deputyApproveAdvertisement );
 router.post("/pullback/advertisement/deputy", deputyPullBackAction );
+router.patch("/reject/advertisement/deputy", deputyRejectAdvertisement );
 export default router;

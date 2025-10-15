@@ -1,5 +1,5 @@
 import express from "express";
-import { automaticAllocationSendToDeputy, automaticAllocationSendToNewspaper, createAdvertisement, deputyApproveAdvertisement, deputyPullBackAction, editAdvertisement, generateAdvertisementReport, getAdvertisementById, getAdvertisementCountByYear, manualAllocationSendToDeputy, manualAllocationSendToNewspaper, } from "../controllers/advertisementController.js";
+import { automaticAllocationSendToDeputy, automaticAllocationSendToNewspaper, createAdvertisement, deputyApproveAdvertisement, deputyPullBackAction, deputyRejectAdvertisement, editAdvertisement, generateAdvertisementReport, getAdvertisementById, getAdvertisementCountByYear, manualAllocationSendToDeputy, manualAllocationSendToNewspaper, } from "../controllers/advertisementController.js";
 const router = express.Router();
 router.post("/createReleaseOrder", createAdvertisement);
 router.get("/getAdvertisements/byId/:id", getAdvertisementById);
@@ -12,5 +12,6 @@ router.post("/advertisement/pdf-report", generateAdvertisementReport);
 router.get("/stats/advertisement/count/year/:year", getAdvertisementCountByYear);
 router.post("/approve/advertisement/deputy", deputyApproveAdvertisement);
 router.post("/pullback/advertisement/deputy", deputyPullBackAction);
+router.patch("/reject/advertisement/deputy", deputyRejectAdvertisement);
 export default router;
 //# sourceMappingURL=advertisementRoute.js.map

@@ -13,4 +13,5 @@ export declare const generateAdvertisementReport: (req: Request, res: Response) 
 export declare const getAdvertisementCountByYear: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const deputyApproveAdvertisement: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const deputyPullBackAction: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+export declare const deputyRejectAdvertisement: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 //# sourceMappingURL=advertisementController.d.ts.map

@@ -2690,3 +2690,202 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+export const deputyRejectAdvertisement = async (req: Request, res: Response) => {
+  const {
+    advertisementId,
+    Feedback,
+    user_id,
+    user_role,
+    platform,
+    screen
+  } = req.body
+  // console.dir(req.body, { depth: null });
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
+  //read document from user collection
+  const userRef = doc(db, "Users", user_id)
+  const userSnapshot = await getDoc(userRef)
+  if (!userSnapshot.exists()) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+  const userData = userSnapshot.data();
+  if (!userData) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+  try {
+    //read advertisement document
+    const adRef = doc(db, "Advertisement", advertisementId);
+    const adSnap = await getDoc(adRef);
+    if (!adSnap.exists()) {
+      return res.status(404).json({ success: false, message: "Advertisement not found" });
+    }
+    const data = adSnap.data();
+    if (!data) {
+      return res.status(404).json({ success: false, message: "Advertisement not found" });
+    }
+    //update advertisement
+    await updateDoc(adRef, {
+      Feedback: Feedback,
+      Status_Deputy: 3,
+      IsrequesPending: false,
+      Status_Caseworker: 3,
+      DateOfRejection: serverTimestamp(),
+
+    });
+    const updatedData = (await getDoc(adRef)).data();
+
+    //create action log
+    const actionLog = new ActionLog({
+      user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+      islogin: false,
+      rodocref: null,
+      ronumber: null,
+      docrefinvoice: null,
+      old_data: data || {},
+      edited_data: updatedData || {},
+      user_role,
+      action: 31,
+      message: "Advertisement Approved by Deputy updated Advertisement document",
+      status: "Success",
+      platform: platform,
+      networkip: clientIp || null,
+      screen: screen,
+      adRef: adRef,
+      actiontime: moment().tz("Asia/Kolkata").toDate(),
+      Newspaper_allocation: {
+        Newspaper: [],
+        allotedtime: null,
+        allocation_type: null,
+        allotedby: null
+      },
+      note_sheet_allocation: null,
+    });
+    await addDoc(collection(db, "actionLogs"), { ...actionLog })
+
+    //mail send for acceptOrder
+    const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+    const userEmailDocSnap = usersEmailSnap.docs[0];
+    if (!userEmailDocSnap) {
+      throw new Error("UsersEmail document does not exist");
+    }
+    const usersEmailData = userEmailDocSnap.data();
+    let toMail = usersEmailData["technicalassistantadvtgmailcom"];
+
+    if (!toMail) {
+      return res.status(404).json({
+        success: false,
+        message: "Email not found",
+      });
+    }
+    try {
+      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: toMail,
+          // to: "jayanthbr@digi9.co.in",
+          roNumber: data.AdvertisementId,
+          result: "rejected.",
+          resultComment:`Feedback : ${Feedback}`,
+        }),
+      });
+      if (response.status == 200) {
+        //create action log for mail sent
+        const actionLog = new ActionLog({
+          user_ref: user_id ? doc(db, "Users", user_id) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          docrefinvoice: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Advertisement Approved by Deputy mail sent successfully to department  ${toMail}`,
+          status: "Success",
+          platform: platform,
+          networkip: clientIp || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+          note_sheet_allocation: null,
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      } else {
+        const actionLog = new ActionLog({
+          user_ref: user_id ? doc(db, "Users", user_id) : null,
+          islogin: false,
+          rodocref: null, // each allocation doc ref
+          ronumber: null,
+          docrefinvoice: null,
+          old_data: {},
+          edited_data: {},
+          user_role,
+          action: 10,
+          message: `Advertisement Approved by Deputy mail failed to send to department ${toMail}`,
+          status: "Failed",
+          platform: platform,
+          networkip: clientIp || null,
+          screen,
+          Newspaper_allocation: {
+            Newspaper: [],
+            allotedtime: null,
+            allocation_type: null,
+            allotedby: null,
+          },
+          adRef: adRef,
+          actiontime: moment().tz("Asia/Kolkata").toDate(),
+          note_sheet_allocation: null,
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      }
+    }
+    catch (error) {
+      console.error("Error sending email:", error);
+    }
+    res.status(200).json({ success: true, message: "Advertisement approved successfully", data: updatedData });
+  } catch (error: Error | any) {
+    // create action log
+      const actionLog = new ActionLog({
+      user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+      islogin: false,
+      rodocref: null,
+      ronumber: null,
+      docrefinvoice: null,
+      old_data: {},
+      edited_data:  {},
+      user_role,
+      action: 31,
+      message: `Advertisement Approved by Deputy failed  Error: ${error.message}`,
+      status: "Failed",
+      platform: platform,
+      networkip: clientIp || null,
+      screen: screen,
+      adRef: null,
+      actiontime: moment().tz("Asia/Kolkata").toDate(),
+      Newspaper_allocation: {
+        Newspaper: [],
+        allotedtime: null,
+        allocation_type: null,
+        allotedby: null
+      },
+      note_sheet_allocation: null,
+    });
+    await addDoc(collection(db, "actionLogs"), { ...actionLog })
+    console.error("❌ Error approving advertisement:", error);
+    res.status(500).json({ success: false, message: "Error approving advertisement", error: error });
+  }
+};
