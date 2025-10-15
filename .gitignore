@@ -141,3 +141,5 @@ vite.config.ts.timestamp-*
 .vite/
 script.js
 script.ts
+decryptionScript.js
+encryptionScript.js
