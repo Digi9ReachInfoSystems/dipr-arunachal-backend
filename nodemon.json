@@ -5,7 +5,8 @@
     "src/routes",
     "src/models",
     "src/configs", 
-    "src/utils"
+    "src/utils",
+    "src"
   ],
   "ext": "ts,json",
   "ignore": ["dist", "node_modules"],

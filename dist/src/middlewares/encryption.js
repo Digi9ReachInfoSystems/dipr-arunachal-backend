@@ -1,0 +1,53 @@
+export default (encrypt, decrypt) => {
+    return {
+        decryptRequestBody: (req, res, next) => {
+            const excludedRoutes = ["/api/webhooks/zoom-webhook"];
+            // console.log("🟡 Decrypting request body for:", req.path);
+            // console.log("🟡 Request body:", req.body);  
+            if (excludedRoutes.some((route) => req.path.startsWith(route))) {
+                // console.log("🟡 Skipping decryption for:", req.path);
+                return next();
+            }
+            if (req.headers.api_key === process.env.FLUTTER_API_KEY) {
+                return next();
+            }
+            if (req.body?.encryptedBody) {
+                try {
+                    const decrypted = decrypt(req.body.encryptedBody);
+                    req.body = JSON.parse(decrypted);
+                }
+                catch (error) {
+                    console.error("❌ Decryption failed:", error);
+                    return res.status(400).send("Decryption failed");
+                }
+            }
+            next();
+        },
+        encryptResponseBody: (req, res, next) => {
+            const oldJson = res.json.bind(res);
+            res.json = (body) => {
+                const excludedRoutes = ["/api/webhooks/zoom-webhook"];
+                if (excludedRoutes.some((route) => req.path.startsWith(route))) {
+                    return oldJson(body);
+                }
+                if (req.headers.api_key === process.env.FLUTTER_API_KEY) {
+                    return oldJson(body);
+                }
+                try {
+                    const encryptedBody = encrypt(JSON.stringify(body));
+                    return oldJson({ encryptedBody, dataEncrypted: "true" });
+                }
+                catch (error) {
+                    console.error("❌ Encryption failed:", error);
+                    return oldJson({
+                        success: false,
+                        message: "Encryption failed",
+                        error: error.message,
+                    });
+                }
+            };
+            next();
+        },
+    };
+};
+//# sourceMappingURL=encryption.js.map

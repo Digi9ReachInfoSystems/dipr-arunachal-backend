@@ -6,6 +6,10 @@ import dotenv from "dotenv";
 import bodyParser from "body-parser";
 import axios from "axios";
 import os from "os";
+import createCryption from "./src/utils/Encryption.js";
+import createCryptionMiddleware from "./src/middlewares/encryption.js";
+
+
 // Load env variables
 dotenv.config();
 
@@ -25,6 +29,11 @@ declare global {
     }
   }
 }
+const { encrypt, decrypt } = createCryption(process.env.CRYPTION_KEY || "my32charsecretkey12345678901234");
+const { decryptRequestBody, encryptResponseBody } = createCryptionMiddleware(encrypt, decrypt);
+
+app.use(decryptRequestBody);
+// app.use(encryptResponseBody);
 
 // Middleware to extract client IP
 app.use((req: Request, _res: Response, next: NextFunction) => {
