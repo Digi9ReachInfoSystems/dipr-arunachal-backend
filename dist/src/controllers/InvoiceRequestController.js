@@ -2237,7 +2237,7 @@ export const invoiceNoteSheetAcknowledgeUnderSecratory = async (req, res) => {
             old_data: approvedAdData || {},
             edited_data: updatedData || {},
             user_role,
-            action: 21,
+            action: 12,
             message: `Invoice Request Approve  by Under Secratory updated approved add document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -2286,7 +2286,7 @@ export const invoiceNoteSheetAcknowledgeUnderSecratory = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by Under Secratory mail sent successfully to department  ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -2314,7 +2314,7 @@ export const invoiceNoteSheetAcknowledgeUnderSecratory = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by Under Secratory  mail failed to send to department ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -2336,6 +2336,33 @@ export const invoiceNoteSheetAcknowledgeUnderSecratory = async (req, res) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
+        //create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 500,
+            message: `Invoice Request Approve  by Under Secratory Successfull path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "Invoice Request Approve  by Under Secratory successfully" });
     }
     catch (error) {
@@ -2349,7 +2376,7 @@ export const invoiceNoteSheetAcknowledgeUnderSecratory = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 21,
+            action: 500,
             message: `Invoice Request Approve  by Under Secratory Failed Error: ${error.message} path: /invoiceRequest/${req.path}`,
             status: "Failed",
             platform: platform,
@@ -2436,7 +2463,7 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
             old_data: approvedAdData || {},
             edited_data: updatedData || {},
             user_role,
-            action: 22,
+            action: 12,
             message: `Invoice Request Approve  by IsSc updated approved add document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -2480,7 +2507,7 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
             old_data: adminData || {},
             edited_data: updatedAdminData || {},
             user_role,
-            action: 22,
+            action: 15,
             message: `Invoice Request Approve  by IsSc updated admindata document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -2528,7 +2555,7 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by IsSc mail sent successfully to department  ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -2556,7 +2583,7 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by IsSc  mail failed to send to department ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -2622,7 +2649,7 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by IsSc mail sent successfully to department  ${toMailTwo} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -2650,7 +2677,7 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by IsSc  mail failed to send to department ${toMailTwo} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -2672,6 +2699,33 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
+        //create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 600,
+            message: `Invoice Request Approve  by IsSc successfull path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "Invoice Request Approve  by IsSc successfully" });
     }
     catch (error) {
@@ -2685,7 +2739,7 @@ export const invoiceNoteSheetAcknowledgeIsSc = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 22,
+            action: 600,
             message: `Invoice Request Approve  by IsSc Failed Error: ${error.message} path: /invoiceRequest/${req.path}`,
             status: "Failed",
             platform: platform,
@@ -3253,7 +3307,7 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
             old_data: approvedAdData || {},
             edited_data: updatedData || {},
             user_role,
-            action: 26,
+            action: 12,
             message: `Invoice Request Reject  by Under Secratory updated approved add document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -3323,7 +3377,7 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Reject  by Under Secratory mail sent successfully to department  ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -3351,7 +3405,7 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Reject  by Under Secratory  mail failed to send to department ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -3373,6 +3427,33 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
+        //create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 501,
+            message: `Invoice Request Reject  by Under Secratory Successfull path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "Invoice Request Reject  by Under Secratory successfully" });
     }
     catch (error) {
@@ -3386,7 +3467,7 @@ export const invoiceNoteSheetRejectUnderSecratory = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 26,
+            action: 501,
             message: `Invoice Request Reject  by Under Secratory Failed Error: ${error.message} path: /invoiceRequest/${req.path}`,
             status: "Failed",
             platform: platform,
@@ -3473,7 +3554,7 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
             old_data: approvedAdData || {},
             edited_data: updatedData || {},
             user_role,
-            action: 27,
+            action: 12,
             message: `Invoice Request Reject  by IsSc updated approved add document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -3543,7 +3624,7 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Reject  by IsSc mail sent successfully to department  ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -3571,7 +3652,7 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Reject  by IsSc  mail failed to send to department ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -3593,6 +3674,33 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
+        //create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 601,
+            message: `Invoice Request Reject  by IsSc successfull path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "Invoice Request Rejected  by IsSc successfully" });
     }
     catch (error) {
@@ -3606,7 +3714,7 @@ export const invoiceNoteSheetRejectIsSc = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 27,
+            action: 601,
             message: `Invoice Request Reject  by IsSc Failed Error: ${error.message} path: /invoiceRequest/${req.path}`,
             status: "Failed",
             platform: platform,
@@ -3972,7 +4080,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
             old_data: adminData || {},
             edited_data: updatedAdminData || {},
             user_role,
-            action: 29,
+            action: 15,
             message: `Invoice Request Approve  by FAO for selecting LDC/UDC updated admindata document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -4038,7 +4146,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by FAO for selecting LDC/UDC mail sent successfully to department  ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -4066,7 +4174,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by FAO for selecting LDC/UDC  mail failed to send to department ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -4115,7 +4223,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by FAO for selecting LDC/UDC mail sent successfully to department  ${toMailTwo} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -4143,7 +4251,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by FAO for selecting LDC/UDC  mail failed to send to department ${toMailTwo} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -4165,6 +4273,33 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
+        //create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 401,
+            message: `Invoice Request Approve  by FAO for selecting LDC/UDC Successfull path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "Invoice Request Approve  by FAO for selecting LDC/UDC successfully" });
     }
     catch (error) {
@@ -4178,7 +4313,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 29,
+            action: 401,
             message: `Invoice Request Approve  by FAO for selecting LDC/UDC Failed Error: ${error.message} path: /invoiceRequest/${req.path}`,
             status: "Failed",
             platform: platform,
@@ -4250,7 +4385,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
             old_data: approvedAdData || {},
             edited_data: updatedData || {},
             user_role,
-            action: 30,
+            action: 12,
             message: `Invoice Request Approve  by FAO for selecting Undersecretary updated approved add document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -4299,7 +4434,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by FAO for selecting Undersecretary mail sent successfully to department  ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -4327,7 +4462,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Request Approve  by FAO for selecting Undersecretary  mail failed to send to department ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -4349,6 +4484,33 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
         catch (error) {
             console.error("Error sending email:", error);
         }
+        //create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 402,
+            message: `Invoice Request Approve  by FAO for selecting Undersecretary Successfull path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "Invoice Request Approve  by FAO for selecting Undersecretary successfully" });
     }
     catch (error) {
@@ -4362,7 +4524,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
             old_data: {},
             edited_data: {},
             user_role,
-            action: 30,
+            action: 402,
             message: `Invoice Request Approve  by FAO for selecting Undersecretary Failed Error: ${error.message} path: /invoiceRequest/${req.path}`,
             status: "Failed",
             platform: platform,

@@ -17,7 +17,30 @@ app.use(express.json());
 const { encrypt, decrypt } = createCryption(process.env.CRYPTION_KEY || "my32charsecretkey12345678901234");
 const { decryptRequestBody, encryptResponseBody } = createCryptionMiddleware(encrypt, decrypt);
 app.use(decryptRequestBody);
-// app.use(encryptResponseBody);
+const ENCRYPTION_IGNORE_PATHS = [
+    '/actionLogs',
+    '/dashboard',
+];
+const ENCRYPTION_IGNORE_EXACT_PATHS = [
+    '/advertisement/stats/advertisement/count/year',
+    '/invoiceRequest/stats/invoiceRequest/count/year',
+    '/newsPaperJobAllocation/stats/newspaperJobAllocation/count/year',
+    `/newsPaperJobAllocation/stats/newspaperJobAllocation/count_by_user/year`,
+    `/approvedAdd/stats/approvedAdd/count/year`
+];
+// Custom encryption middleware that skips specified paths
+app.use((req, res, next) => {
+    const shouldSkipEncryption = ENCRYPTION_IGNORE_PATHS.some(path => req.path.startsWith(path));
+    const shouldSkipEncryptionExact = ENCRYPTION_IGNORE_EXACT_PATHS.some(path => {
+        return req.path.startsWith(path);
+    });
+    if (shouldSkipEncryption || shouldSkipEncryptionExact) {
+        // Skip encryption for ignored paths
+        return next();
+    }
+    // Apply encryption for all other routes
+    encryptResponseBody(req, res, next);
+});
 // Middleware to extract client IP
 app.use((req, _res, next) => {
     const clientIp = req.headers["x-forwarded-for"]?.toString().split(",")[0] || // first IP in chain
