@@ -11,18 +11,20 @@ export default (encrypt, decrypt) => {
             if (req.headers.api_key === process.env.FLUTTER_API_KEY) {
                 return next();
             }
-            if (req.body?.encryptedBody) {
-                try {
-                    const decrypted = decrypt(req.body.encryptedBody);
-                    req.body = JSON.parse(decrypted);
+            if (req.body) {
+                if (req.body?.encryptedBody) {
+                    try {
+                        const decrypted = decrypt(req.body.encryptedBody);
+                        req.body = JSON.parse(decrypted);
+                    }
+                    catch (error) {
+                        console.error("❌ Decryption failed:", error);
+                        return res.status(400).send("Decryption failed");
+                    }
                 }
-                catch (error) {
-                    console.error("❌ Decryption failed:", error);
+                else {
                     return res.status(400).send("Decryption failed");
                 }
-            }
-            else {
-                return res.status(400).send("Decryption failed");
             }
             next();
         },

@@ -2043,7 +2043,7 @@ export const deputyApproveAdvertisement = async (req, res) => {
             old_data: data,
             edited_data: updatedData ?? {},
             user_role: req.body.user_role || "",
-            action: 5,
+            action: 6,
             message: `Advertisement approved by Deputy updated Advertisement Document path: /advertisement/${req.path}`,
             status: "Success",
             platform: req.body.platform,
@@ -2441,7 +2441,7 @@ export const deputyPullBackAction = async (req, res) => {
             old_data: data,
             edited_data: updatedData ?? {},
             user_role: req.body.user_role || "",
-            action: 7,
+            action: 6,
             message: `PullBack operation performed by Deputy on advertisement: ${advertisementId} path: /advertisement/${req.path}`,
             status: "Success",
             platform: req.body.platform,
@@ -2483,7 +2483,7 @@ export const deputyPullBackAction = async (req, res) => {
                 old_data: old_data ?? {},
                 edited_data: new_data ?? {},
                 user_role: req.body.user_role || "",
-                action: 7,
+                action: 8,
                 message: `PullBack operation performed by Deputy on advertisement: ${advertisementId} and NewspaperJobAllocation: ${docRef.id} path: /advertisement/${req.path}`,
                 status: "Success",
                 platform: req.body.platform,
@@ -2500,6 +2500,31 @@ export const deputyPullBackAction = async (req, res) => {
             });
             await addDoc(collection(db, "actionLogs"), { ...actionLog });
         }
+        //create action logs
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            old_data: {},
+            edited_data: {},
+            user_role: req.body.user_role || "",
+            action: 202,
+            message: ` PullBack operation performed by Deputy on advertisement is successfully: ${advertisementId} path: /advertisement/${req.path}`,
+            status: "Success",
+            platform: req.body.platform,
+            networkip: clientIp || null,
+            screen: req.body.screen,
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+            },
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            adRef: adRef,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({
             success: true,
             message: "PullBack operation performed successfully",
@@ -2515,7 +2540,7 @@ export const deputyPullBackAction = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role: req.body.user_role || "",
-            action: 7,
+            action: 202,
             message: `Error while performing PullBack operation performed by Deputy on advertisement: ${error.message} path: /advertisement/${req.path}`,
             status: "Failed",
             platform: req.body.platform,
@@ -2586,8 +2611,8 @@ export const deputyRejectAdvertisement = async (req, res) => {
             old_data: data || {},
             edited_data: updatedData || {},
             user_role,
-            action: 31,
-            message: `Advertisement Approved by Deputy updated Advertisement document path: /advertisement/${req.path}`,
+            action: 6,
+            message: `Advertisement Rejected by Deputy updated Advertisement document path: /advertisement/${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -2640,7 +2665,7 @@ export const deputyRejectAdvertisement = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Advertisement Approved by Deputy mail sent successfully to department  ${toMail} path: /advertisement/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -2668,7 +2693,7 @@ export const deputyRejectAdvertisement = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Advertisement Approved by Deputy mail failed to send to department ${toMail} path: /advertisement/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -2690,6 +2715,33 @@ export const deputyRejectAdvertisement = async (req, res) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
+        // create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 201,
+            message: `Advertisement Rejected by Deputy Successfully path: /advertisement/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "Advertisement approved successfully", data: updatedData });
     }
     catch (error) {
@@ -2703,8 +2755,8 @@ export const deputyRejectAdvertisement = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 31,
-            message: `Advertisement Approved by Deputy failed  Error: ${error.message} path: /advertisement/${req.path}`,
+            action: 201,
+            message: `Advertisement Rejected by Deputy failed  Error: ${error.message} path: /advertisement/${req.path}`,
             status: "Failed",
             platform: platform,
             networkip: clientIp || null,
