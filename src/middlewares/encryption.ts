@@ -33,6 +33,8 @@ export default (encrypt: (text: string) => EncryptedBody, decrypt: (data: Encryp
                     console.error("❌ Decryption failed:", error);
                     return res.status(400).send("Decryption failed");
                 }
+            }else{
+                return res.status(400).send("Decryption failed");
             }
 
             next();

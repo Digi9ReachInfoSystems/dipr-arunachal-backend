@@ -24,7 +24,7 @@ const actionLogsRef = collection(db, "actionLogs");
 export const createActionLog = async (req: Request, res: Response) => {
   try {
     const body = req.body;
-    // console.log("body", body);
+    console.log("body", body);
     const xForwardedFor = req.headers["x-forwarded-for"];
     const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     // console.log("headers", clientIp, "ip", req.ip);

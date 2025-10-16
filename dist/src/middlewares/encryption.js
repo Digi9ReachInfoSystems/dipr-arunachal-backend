@@ -21,6 +21,9 @@ export default (encrypt, decrypt) => {
                     return res.status(400).send("Decryption failed");
                 }
             }
+            else {
+                return res.status(400).send("Decryption failed");
+            }
             next();
         },
         encryptResponseBody: (req, res, next) => {
