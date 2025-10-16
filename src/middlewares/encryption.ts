@@ -24,17 +24,18 @@ export default (encrypt: (text: string) => EncryptedBody, decrypt: (data: Encryp
                 return next();
             }
 
-
-            if (req.body?.encryptedBody) {
-                try {
-                    const decrypted = decrypt(req.body.encryptedBody);
-                    req.body = JSON.parse(decrypted);
-                } catch (error) {
-                    console.error("❌ Decryption failed:", error);
+            if (req.body) {
+                if (req.body?.encryptedBody) {
+                    try {
+                        const decrypted = decrypt(req.body.encryptedBody);
+                        req.body = JSON.parse(decrypted);
+                    } catch (error) {
+                        console.error("❌ Decryption failed:", error);
+                        return res.status(400).send("Decryption failed");
+                    }
+                } else {
                     return res.status(400).send("Decryption failed");
                 }
-            }else{
-                return res.status(400).send("Decryption failed");
             }
 
             next();
@@ -51,7 +52,7 @@ export default (encrypt: (text: string) => EncryptedBody, decrypt: (data: Encryp
                 }
 
                 if (req.headers.api_key === process.env.FLUTTER_API_KEY) {
-                    return oldJson(body );
+                    return oldJson(body);
                 }
 
                 try {
