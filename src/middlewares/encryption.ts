@@ -46,6 +46,8 @@ export default (encrypt: (text: string) => EncryptedBody, decrypt: (data: Encryp
 
             res.json = (body: any): Response => {
                 const excludedRoutes = ["/api/webhooks/zoom-webhook"];
+                // console.log("🟡 Encrypting response body for:", req.path);
+                // console.log("🟡 Response body:", body);
 
                 if (excludedRoutes.some((route) => req.path.startsWith(route))) {
                     return oldJson(body);
