@@ -1959,7 +1959,7 @@ export const assistantSubmitInvoiceRequest = async (req: Request, res: Response)
     try {
         //update invoice
         await updateDoc(invoiceRef, {
-            isCompleted: false,
+            isCompleted: true,
             isSendForward: false,
             isRead: false
         });

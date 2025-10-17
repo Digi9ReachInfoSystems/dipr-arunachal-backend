@@ -1802,7 +1802,7 @@ export const assistantSubmitInvoiceRequest = async (req, res) => {
     try {
         //update invoice
         await updateDoc(invoiceRef, {
-            isCompleted: false,
+            isCompleted: true,
             isSendForward: false,
             isRead: false
         });
