@@ -338,7 +338,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       old_data: oldData,
       edited_data: newData,
       user_role: req.body.user_role || "",
-      action: 2,
+      action: 6,
       message: `Advertisement edited with ID ${docRef.id} path: /advertisement/${req.path}`,
       status: "Success",
       platform: req.body.platform,
@@ -373,7 +373,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       old_data: {},
       edited_data: {},
       user_role: req.body.user_role || "",
-      action: 2,
+      action: 6,
       message: `Advertisement edit failed with ID ${id} error: ${error} path: /advertisement/${req.path}`,
       status: "Failed",
       platform: req.body.platform,
@@ -1411,8 +1411,8 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
           createdAt: serverTimestamp(),
         };
         const allocationRef = doc(collection(db, "NewspaperJobAllocation"));
-        console.log("allocationRef", allocationRef);
-        console.log("allocationPayload", allocationPayload);
+        // console.log("allocationRef", allocationRef);
+        // console.log("allocationPayload", allocationPayload);
         transaction.set(allocationRef, allocationPayload);
         // console.log(`📰 Created allocation for vendor ${vendorDocRef}`);
         if (!vendorDocRef) continue;
@@ -1437,7 +1437,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
       // 3. Increment ronumber and rotate queue
 
       // For manual allocation, we do not rotate the queue as per original logic just keep the same order and move the mentioned newspapers to the end
-      console.log("newspapers", newspapers);
+      // console.log("newspapers", newspapers);
       const updatedQueue = [
         // Keep existing newspaper refs that weren’t just allotted
         ...newspapers.filter((np: any) => {

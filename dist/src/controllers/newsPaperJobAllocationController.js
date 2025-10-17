@@ -346,6 +346,7 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
                 message: "Advertisement not found",
             });
         }
+        const oldAddData = adDocSnap.data();
         const adData = adDocSnap.data();
         if (!adData) {
             return res.status(404).json({
@@ -366,6 +367,32 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
             Status_Vendor: 1,
             approvednewspaperslocal: approvednewspaperslocal,
         });
+        const updatedAdData = (await getDoc(data.adref)).data();
+        //create actionLogs
+        const actionLogAdd = new ActionLog({
+            user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+            islogin: false,
+            rodocref: docRef,
+            ronumber: data.roNumber,
+            old_data: oldAddData || {},
+            edited_data: updatedAdData || {},
+            user_role,
+            action: 6,
+            message: `Approved Newspaper Job Allocation  updated Advertisement Document path: /newsPaperJobAllocation/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen: screen,
+            adRef: data.adref,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogAdd });
         //mail functionality
         const userRef = doc(db, "Users", req.body.user_ref);
         const userSnap = await getDoc(userRef);
@@ -408,7 +435,7 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Vendor Approve Release Order mail sent successfully to department ${toMail} path: /newsPaperJobAllocation/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -434,7 +461,7 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Vendor Approve Release Order mail failed to send to department ${toMail} path: /newsPaperJobAllocation/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -483,7 +510,7 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Vendor Approve Release Order mail sent successfully to department ${data.Bearingno} path: /newsPaperJobAllocation/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -509,7 +536,7 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Vendor Approve Release Order mail failed to send to department ${data.Bearingno} path: /newsPaperJobAllocation/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -536,6 +563,31 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
                 error: error.message,
             });
         }
+        //create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+            islogin: false,
+            rodocref: docRef,
+            ronumber: data.roNumber,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 900,
+            message: ` approve Newspaper Job Allocation by Vendor Successfull path: /newsPaperJobAllocation/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen: screen,
+            adRef: data.adref,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "NewspaperJobAllocation approved successfully" });
     }
     catch (error) {
@@ -549,8 +601,8 @@ export const approveNewspaperJobAllocationByVendor = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 8,
-            message: `Failed to approve Newspaper Job Allocation by Vendor path: /newsPaperJobAllocation/${req.path}`,
+            action: 900,
+            message: `Failed to approve Newspaper Job Allocation by Vendor Error: ${error.message} path: /newsPaperJobAllocation/${req.path}`,
             status: "Failed",
             platform: platform,
             networkip: clientIp || null,
@@ -598,6 +650,32 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
             completed: true,
             aprovedcw: false,
         });
+        const updatedData = (await getDoc(docRef)).data();
+        //create action log for mail sent
+        const actionLogNJ = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: docRef, // each allocation doc ref
+            ronumber: null,
+            old_data: data || {},
+            edited_data: updatedData || {},
+            user_role,
+            action: 8,
+            message: `Vendor Reject Release Order updated Newspaper Job Allocation path: /newsPaperJobAllocation/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen,
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+            },
+            adRef: data.adref,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLogNJ });
         const adDocSnap = await getDoc(data.adref);
         if (!adDocSnap.exists()) {
             return res.status(404).json({
@@ -629,6 +707,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                 return path === rejectedPath;
             });
         });
+        const oldAddData = (await getDoc(data.adref)).data();
         await updateDoc(data.adref, {
             Status_Vendor: 1,
             Rejectednewspapers: Rejectednewspapers,
@@ -638,6 +717,32 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
             isDarft: false,
             DateOfRejection: serverTimestamp(),
         });
+        const updatedAddData = (await getDoc(data.adref)).data();
+        //create action log 
+        const actionLogAD = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: docRef, // each allocation doc ref
+            ronumber: null,
+            old_data: oldAddData || {},
+            edited_data: updatedAddData || {},
+            user_role,
+            action: 6,
+            message: `Vendor Reject Release Order updated Advertisement Document path: /newsPaperJobAllocation/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen,
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+            },
+            adRef: data.adref,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+        });
+        const actionLogRefAD = await addDoc(collection(db, "actionLogs"), { ...actionLogAD });
         const userRef = doc(db, "Users", req.body.user_ref);
         const userSnap = await getDoc(userRef);
         const userData = userSnap.data() || {};
@@ -675,7 +780,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Vendor Reject Release Order mail sent successfully to department ${toMail} path: /newsPaperJobAllocation/${req.path}`,
                         status: "Success",
                         platform: platform,
@@ -701,7 +806,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Vendor Reject Release Order mail failed to send to department ${toMail} path: /newsPaperJobAllocation/${req.path}`,
                         status: "Failed",
                         platform: platform,
@@ -753,7 +858,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Vendor Reject Release Order mail sent successfully to department ${toMailTwo} path: /newsPaperJobAllocation/${req.path}`,
                         status: "Success",
                         platform: platform,
@@ -779,7 +884,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Vendor Reject Release Order mail failed to send to department ${toMailTwo} path: /newsPaperJobAllocation/${req.path}`,
                         status: "Failed",
                         platform: platform,
@@ -844,9 +949,36 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
             let newAllotedNewsPaper = oldData.allotednewspapers;
             newAllotedNewsPaper.push(newNewsPaperRef);
             //update Advertisement
+            const OldAddData = adSnap.data();
             await updateDoc(adRef, {
                 allotednewspapers: newAllotedNewsPaper,
             });
+            const UpdatedAddData = (await getDoc(adRef)).data();
+            //create action log 
+            const actionLogAD = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: null, // each allocation doc ref
+                ronumber: null,
+                old_data: OldAddData || {},
+                edited_data: UpdatedAddData || {},
+                user_role,
+                action: 6,
+                message: `Vendor Reject Release Order updated Advertisement Document path: /newsPaperJobAllocation/${req.path}`,
+                status: "Success",
+                platform: platform,
+                networkip: clientIp || null,
+                screen,
+                Newspaper_allocation: {
+                    Newspaper: [],
+                    allotedtime: null,
+                    allocation_type: null,
+                    allotedby: null,
+                },
+                adRef: adRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+            });
+            const actionLogRefAD = await addDoc(collection(db, "actionLogs"), { ...actionLogAD });
             //create New newsPaperJobAllocation
             const allocationPayload = {
                 timeofallotment: serverTimestamp(),
@@ -874,7 +1006,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                 old_data: {},
                 edited_data: {},
                 user_role,
-                action: 3,
+                action: 101,
                 message: `Automatic allocation successful sent to newspapers path: /newsPaperJobAllocation/${req.path}`,
                 status: "Success",
                 platform: platform,
@@ -922,7 +1054,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Automatic Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${newNewsPaper.email} path: /newsPaperJobAllocation/${req.path}`,
                         status: "Success",
                         platform: platform,
@@ -948,7 +1080,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Automatic Allocation sent  to newspaper mail sent to vendors Failed to mail id ${newNewsPaper.email}  path: /newsPaperJobAllocation/${req.path}`,
                         status: "Failed",
                         platform: platform,
@@ -996,7 +1128,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Vendor Reject Release Order mail sent successfully to department ${toMail} path: /newsPaperJobAllocation/${req.path}`,
                         status: "Success",
                         platform: platform,
@@ -1022,7 +1154,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Vendor Reject Release Order mail failed to send to department ${toMail} path: /newsPaperJobAllocation/${req.path}`,
                         status: "Failed",
                         platform: platform,
@@ -1074,7 +1206,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Vendor Reject Release Order mail sent successfully to department ${toMailTwo} path: /newsPaperJobAllocation/${req.path}`,
                         status: "Success",
                         platform: platform,
@@ -1100,7 +1232,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                         old_data: {},
                         edited_data: {},
                         user_role,
-                        action: 10,
+                        action: 4,
                         message: `Vendor Reject Release Order mail failed to send to department ${toMailTwo}  path: /newsPaperJobAllocation/${req.path}`,
                         status: "Failed",
                         platform: platform,
@@ -1139,7 +1271,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
             old_data: data,
             edited_data: newData || {},
             user_role,
-            action: 9,
+            action: 901,
             message: `NewspaperJobAllocation rejected successfully by vendor path: /newsPaperJobAllocation/${req.path}`,
             status: "Success",
             platform: platform,
@@ -1171,7 +1303,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
             old_data: data,
             edited_data: {},
             user_role,
-            action: 9,
+            action: 901,
             message: `NewspaperJobAllocation rejected failed by vendor ${error} path: /newsPaperJobAllocation/${req.path}`,
             status: "Failed",
             platform: platform,

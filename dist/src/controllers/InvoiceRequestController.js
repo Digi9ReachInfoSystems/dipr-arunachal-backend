@@ -44,12 +44,12 @@ export const getInvoiceRequestCount = async (req, res) => {
     }
 };
 export const createInvoice = async (req, res) => {
+    const { Assitanttatus, DateOfInvoice, DeptName, InvoiceUrl, Newspaperclip, Ronumber, TypeOfDepartment, Userref, advertiseRef, billingAddress, billno, clerkDivision, deputyDirector_status, 
+    //   deputydirecotor,
+    invoiceamount, isSendForward, jobref, newspaperpageNo, phoneNumber, 
+    //   sendAgain,
+    vendorName, user_id, user_role, platform, screen } = req.body;
     try {
-        const { Assitanttatus, DateOfInvoice, DeptName, InvoiceUrl, Newspaperclip, Ronumber, TypeOfDepartment, Userref, advertiseRef, billingAddress, billno, clerkDivision, deputyDirector_status, 
-        //   deputydirecotor,
-        invoiceamount, isSendForward, jobref, newspaperpageNo, phoneNumber, 
-        //   sendAgain,
-        vendorName, user_id, user_role, platform, screen } = req.body;
         // Basic validation
         if (!Ronumber || !InvoiceUrl || !Userref) {
             return res.status(400).json({
@@ -116,8 +116,8 @@ export const createInvoice = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 11,
-            message: `Invoice Raised by vendor and document created path: /invoiceRequest/${req.path}`,
+            action: 9,
+            message: `Invoice Raised by vendor and Invoice Request document created path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
             networkip: req.ip || null,
@@ -169,7 +169,7 @@ export const createInvoice = async (req, res) => {
                 old_data: oldData || {},
                 edited_data: editedData || {},
                 user_role,
-                action: 11,
+                action: 6,
                 message: `Invoice Raised by vendor and Advertisement Document updated path: /invoiceRequest/${req.path}`,
                 status: "Success",
                 platform: platform,
@@ -206,7 +206,7 @@ export const createInvoice = async (req, res) => {
                 old_data: oldData || {},
                 edited_data: editedData || {},
                 user_role,
-                action: 11,
+                action: 8,
                 message: `Invoice Raised by vendor and Newspaper Job Allocation Document updated path: /invoiceRequest/${req.path}`,
                 status: "Success",
                 platform: platform,
@@ -270,7 +270,7 @@ export const createInvoice = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Raised mail sent successfully to department  ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -297,7 +297,7 @@ export const createInvoice = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Raised  mail failed to send to department ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -317,7 +317,32 @@ export const createInvoice = async (req, res) => {
         }
         catch (error) {
             console.error("Error sending email:", error);
-        }
+        } //create action logs
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 902,
+            message: `Invoice Raised by vendor Successfull path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(201).json({
             success: true,
             message: "Invoice created successfully",
@@ -325,6 +350,32 @@ export const createInvoice = async (req, res) => {
         });
     }
     catch (error) {
+        //create action logs
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 902,
+            message: `Invoice Raised by vendor Failed Error- ${error.message} path: /invoiceRequest/${req.path}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
         console.error("❌ Error creating invoice:", error);
         res.status(500).json({
             success: false,
@@ -334,10 +385,12 @@ export const createInvoice = async (req, res) => {
     }
 };
 export const editInvoice = async (req, res) => {
+    const { InvoiceId, Assitanttatus, DateOfInvoice, DeptName, InvoiceUrl, Newspaperclip, Ronumber, TypeOfDepartment, Userref, advertiseRef, billingAddress, billno, clerkDivision, deputyDirector_status, invoiceamount, 
+    // isSendForward,
+    jobref, newspaperpageNo, phoneNumber, vendorName, user_id, user_role, platform, screen } = req.body;
+    // Reference to the invoice document
+    const invoiceRef = doc(db, "Invoice_Request", InvoiceId);
     try {
-        const { InvoiceId, Assitanttatus, DateOfInvoice, DeptName, InvoiceUrl, Newspaperclip, Ronumber, TypeOfDepartment, Userref, advertiseRef, billingAddress, billno, clerkDivision, deputyDirector_status, invoiceamount, 
-        // isSendForward,
-        jobref, newspaperpageNo, phoneNumber, vendorName, user_id, user_role, platform, screen } = req.body;
         // Validate ID
         if (!InvoiceId) {
             return res.status(400).json({
@@ -345,8 +398,6 @@ export const editInvoice = async (req, res) => {
                 message: "InvoiceId is required.",
             });
         }
-        // Reference to the invoice document
-        const invoiceRef = doc(db, "Invoice_Request", InvoiceId);
         const oldDataInvoiceSnap = (await getDoc(invoiceRef)).data();
         // Build update payload dynamically
         const updateData = {
@@ -416,8 +467,8 @@ export const editInvoice = async (req, res) => {
             old_data: oldDataInvoiceSnap || {},
             edited_data: newDataInvoiceSnap || {},
             user_role,
-            action: 11,
-            message: `Invoice Edited by vendor and document updated successfully path: /invoiceRequest/${req.path}`,
+            action: 10,
+            message: `Invoice Edited by vendor and Invoice Request document updated successfully path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
             networkip: req.ip || null,
@@ -469,7 +520,7 @@ export const editInvoice = async (req, res) => {
                 old_data: oldData || {},
                 edited_data: editedData || {},
                 user_role,
-                action: 11,
+                action: 6,
                 message: `Invoice Edited by vendor and Advertisement Document updated path: /invoiceRequest/${req.path}`,
                 status: "Success",
                 platform: platform,
@@ -508,7 +559,7 @@ export const editInvoice = async (req, res) => {
                 old_data: oldData || {},
                 edited_data: editedData || {},
                 user_role,
-                action: 11,
+                action: 8,
                 message: `Invoice Edited by vendor and Newspaper Job Allocation Document updated path: /invoiceRequest/${req.path}`,
                 status: "Success",
                 platform: platform,
@@ -572,7 +623,7 @@ export const editInvoice = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Edited mail sent successfully to department  ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -599,7 +650,7 @@ export const editInvoice = async (req, res) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `Invoice Edited  mail failed to send to department ${toMail} path: /invoiceRequest/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -620,12 +671,64 @@ export const editInvoice = async (req, res) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
+        //create actionLogs
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: invoiceRef,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 903,
+            message: `Invoice Edited by vendor Failed Successfull updated path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({
             success: true,
             message: "Invoice updated successfully",
         });
     }
     catch (error) {
+        //create actionLogs
+        const actionLog = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: invoiceRef,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 903,
+            message: `Invoice Edited by vendor Failed Error- ${error.message} updated path: /invoiceRequest/${req.path}`,
+            status: "Failed",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLog });
         console.error("❌ Error updating invoice:", error);
         res.status(500).json({
             success: false,
@@ -1512,7 +1615,7 @@ export const assistantApproveInvoiceRequest = async (req, res) => {
             old_data: invoiceData || {},
             edited_data: updatedData || {},
             user_role,
-            action: 16,
+            action: 10,
             message: `Invoice Request Approve  by Assistant updated Invoice Request document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -1547,7 +1650,7 @@ export const assistantApproveInvoiceRequest = async (req, res) => {
             old_data: addOldData || {},
             edited_data: updatedAdData || {},
             user_role,
-            action: 16,
+            action: 6,
             message: `Invoice RequestApprove  by Assistant updated Advertisement Document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -1605,7 +1708,7 @@ export const assistantApproveInvoiceRequest = async (req, res) => {
             old_data: userData || {},
             edited_data: updatedUserData || {},
             user_role,
-            action: 16,
+            action: 17,
             message: `Invoice RequestApprove  by Assistant updated User Document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -1621,6 +1724,32 @@ export const assistantApproveInvoiceRequest = async (req, res) => {
             }
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLogUser });
+        // create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 701,
+            message: `Invoice Request Approve  by Assistant Successfull path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "Invoice Request approve by Assistant successfully" });
     }
     catch (error) {
@@ -1634,7 +1763,7 @@ export const assistantApproveInvoiceRequest = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 16,
+            action: 701,
             message: `Invoice Request Approve  by Assistant Failed Error- ${error.message} path: /invoiceRequest/${req.path}`,
             status: "Failed",
             platform: platform,
@@ -1688,7 +1817,7 @@ export const assistantSubmitInvoiceRequest = async (req, res) => {
             old_data: invoiceData || {},
             edited_data: updatedData || {},
             user_role,
-            action: 17,
+            action: 10,
             message: `Invoice Request Submit  by Assistant updated Invoice Request document path: /invoiceRequest/${req.path}`,
             status: "Success",
             platform: platform,
@@ -1704,6 +1833,32 @@ export const assistantSubmitInvoiceRequest = async (req, res) => {
             }
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        // create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: invoiceData.jobref,
+            ronumber: invoiceData.Ronumber,
+            docrefinvoice: invoiceRef,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 703,
+            message: `Invoice Request Submit  by Assistant Successfull path: /invoiceRequest/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: req.ip || null,
+            screen: screen,
+            adRef: invoiceData.advertiseRef,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            }
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
         res.status(200).json({ success: true, message: "Invoice Request submit by Assistant successfully" });
     }
     catch (error) {
@@ -1717,7 +1872,7 @@ export const assistantSubmitInvoiceRequest = async (req, res) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 17,
+            action: 703,
             message: `Invoice Request Submit  by Assistant Failed Error- ${error.message} path: /invoiceRequest/${req.path}`,
             status: "Failed",
             platform: platform,
