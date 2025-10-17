@@ -105,20 +105,30 @@ export const createNoteSheet = async (req, res) => {
         const approved_addRef = doc(approved_addCollection);
         let division;
         let invoice;
-        switch (user_role) {
-            case "IsLdc1":
-                division = 1;
-                invoice = 'UDC - 2';
-                break;
-            case "IsLdc2":
-                division = 2;
-                invoice = 'LDC - 1';
-                break;
-            default:
-                invoice = 'UDC - 1';
-                division = 3;
-                break;
+        if (userData.IsLdc1) {
+            division = 1;
+            invoice = 'UDC - 2';
         }
+        else if (userData.IsLdc2) {
+            division = 2;
+            invoice = 'LDC - 1';
+        }
+        else {
+            invoice = 'UDC - 1';
+            division = 3;
+        }
+        // switch (user_role) {
+        //     case "IsLdc1":
+        //         division = 1;
+        //         invoice = 'UDC - 2'
+        //         break;
+        //     case "IsLdc2":
+        //         division = 2;
+        //         invoice = 'LDC - 1'
+        //         break;
+        //     default:
+        //         break;
+        // }
         let notesheetdetails = [];
         notesheetdetails.push({});
         await setDoc(approved_addRef, {
