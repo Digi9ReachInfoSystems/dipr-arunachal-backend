@@ -216,7 +216,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 18,
+            action: 11,
             message: `NoteSheet Created new document created in approved_add collection path: /approvedAdd/${req.path}`,
             status: "Success",
             platform: platform,
@@ -257,7 +257,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 18,
+            action: 13,
             message: `NoteSheet Created new document created in bugdetDetails collection path: /approvedAdd/${req.path}`,
             status: "Success",
             platform: platform,
@@ -294,8 +294,8 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             old_data: adminData,
             edited_data: updatedData || {},
             user_role,
-            action: 18,
-            message: `NoteSheet Created new document updated in adminData collection path: /approvedAdd/${req.path}` ,
+            action: 15,
+            message: `NoteSheet Created new document updated in adminData collection path: /approvedAdd/${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -333,7 +333,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             old_data: userData,
             edited_data: updatedUserData || {},
             user_role,
-            action: 18,
+            action: 17,
             message: `NoteSheet Created new document updated in user collection path: /approvedAdd/${req.path}`,
             status: "Success",
             platform: platform,
@@ -383,7 +383,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `NoteSheet Created mail sent successfully to   ${toMail} path: /approvedAdd/${req.path}`,
                     status: "Success",
                     platform: platform,
@@ -410,7 +410,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
+                    action: 4,
                     message: `NoteSheet Createdmail failed to send to  ${toMail} path: /approvedAdd/${req.path}`,
                     status: "Failed",
                     platform: platform,
@@ -433,6 +433,34 @@ export const createNoteSheet = async (req: Request, res: Response) => {
         catch (error) {
             console.error("Error sending email:", error);
         }
+        // create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 700,
+            message: `NoteSheet Created  Successfull path: /approvedAdd/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: null,
+
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess })
         res.status(200).json({ success: true, message: "NoteSheet created successfully", notesheetno: noteSheetNo });
 
     } catch (error: Error | any) {
@@ -446,7 +474,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 18,
+            action: 700,
             message: `NoteSheet Created  Failed Error: ${error.message} path: /approvedAdd/${req.path}`,
             status: "Failed",
             platform: platform,
@@ -524,8 +552,8 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
             old_data: approvedAdData || {},
             edited_data: updatedData || {},
             user_role,
-            action: 31,
-            message: `Uploaded sanction letter  updated approved add document  path: /approvedAdd/${req.path}`,
+            action: 12,
+            message: `Uploaded sanction letter by assistant  updated approved add document  path: /approvedAdd/${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -572,8 +600,8 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
-                    message: `Uploaded sanction letter   mail sent successfully to department  ${toMail} path: /approvedAdd/${req.path}`,
+                    action: 4,
+                    message: `Uploaded sanction letter by assistant  mail sent successfully to department  ${toMail} path: /approvedAdd/${req.path}`,
                     status: "Success",
                     platform: platform,
                     networkip: clientIp || null,
@@ -599,8 +627,8 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
                     old_data: {},
                     edited_data: {},
                     user_role,
-                    action: 10,
-                    message: `Uploaded sanction letter    mail failed to send to department ${toMail}  path: /approvedAdd/${req.path}`,
+                    action: 4,
+                    message: `Uploaded sanction letter by assistant    mail failed to send to department ${toMail}  path: /approvedAdd/${req.path}`,
                     status: "Failed",
                     platform: platform,
                     networkip: clientIp || null,
@@ -623,9 +651,35 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
             console.error("Error sending email:", error);
         }
 
+        //create action log
+        const actionLogSuccess = new ActionLog({
+            user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+            islogin: false,
+            rodocref: null,
+            ronumber: null,
+            docrefinvoice: null,
+            old_data: {},
+            edited_data: {},
+            user_role,
+            action: 702,
+            message: `Uploaded sanction letter by assistant Successfull path: /approvedAdd/${req.path}`,
+            status: "Success",
+            platform: platform,
+            networkip: clientIp || null,
+            screen: screen,
+            adRef: null,
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null
+            },
+            note_sheet_allocation: approvedAdRef || null,
+        });
+        await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
 
-
-        res.status(200).json({ success: true, message: "Sanction letter uploaded successfully" });
+        res.status(200).json({ success: true, message: "Sanction letter uploaded successfully by assistant" });
 
     } catch (error: Error | any) {
         //create action log
@@ -638,8 +692,8 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
             old_data: {},
             edited_data: {},
             user_role,
-            action: 30,
-            message: `Uploaded sanction letter  Failed Error - ${error.message} path: /approvedAdd/${req.path}`,
+            action: 702,
+            message: `Uploaded sanction letter by assistant Failed Error - ${error.message} path: /approvedAdd/${req.path}`,
             status: "Failed",
             platform: platform,
             networkip: clientIp || null,
