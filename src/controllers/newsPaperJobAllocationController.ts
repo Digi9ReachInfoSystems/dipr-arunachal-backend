@@ -157,7 +157,7 @@ export const updateApproveCvAndTimeAllotment = async (req: Request, res: Respons
                 body: JSON.stringify({
                     to,
                     advertisementNumber,
-                    cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+                    cc: "diprarunadvt@gmail.com",
                     listOfNewspapers: newsPaperList,
                 }),
             });
