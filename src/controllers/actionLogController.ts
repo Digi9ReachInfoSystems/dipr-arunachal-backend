@@ -29,7 +29,7 @@ export const createActionLog = async (req: Request, res: Response) => {
     const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
     // console.log("headers", clientIp, "ip", req.ip);
     const normalize = (val: any) =>
-      val === "null" || val === "undefined" || val === undefined || val === null || val === 100 ? null : val;
+      val === "null" || val === "undefined" || val === undefined || val === null || val === 0 ? null : val;
 
     // Normalize top-level string fields
     for (const key of Object.keys(body)) {
@@ -215,8 +215,8 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
     if (user_role && user_role !== "All") {
       constraints.push(where("user_role", "==", String(user_role)));
     }
-
-    if (action && action !== "All") {
+    console.log("action", action);
+    if (action && action !== "0") {
       constraints.push(where("action", "==", Number(action)));
     }
 
