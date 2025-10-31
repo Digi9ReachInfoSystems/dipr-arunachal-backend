@@ -130,7 +130,7 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
       limit = 10,
       adRef,
     } = req.query;
-
+    console.log("req.query", req.query);
     const constraints: QueryConstraint[] = [];
 
     if (user_ref && user_ref !== "All") {
