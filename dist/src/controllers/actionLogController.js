@@ -11,7 +11,7 @@ export const createActionLog = async (req, res) => {
         const xForwardedFor = req.headers["x-forwarded-for"];
         const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
         // console.log("headers", clientIp, "ip", req.ip);
-        const normalize = (val) => val === "null" || val === "undefined" || val === undefined || val === null || val === 100 ? null : val;
+        const normalize = (val) => val === "null" || val === "undefined" || val === undefined || val === null || val === 0 ? null : val;
         // Normalize top-level string fields
         for (const key of Object.keys(body)) {
             body[key] = normalize(body[key]);
@@ -161,7 +161,8 @@ export const getAllActionLogs = async (req, res) => {
         if (user_role && user_role !== "All") {
             constraints.push(where("user_role", "==", String(user_role)));
         }
-        if (action && action !== "All") {
+        console.log("action", action);
+        if (action && action !== "0" && Number(action) !== 0) {
             constraints.push(where("action", "==", Number(action)));
         }
         if (status && status !== "All") {
