@@ -1678,7 +1678,7 @@ export const assistantApproveInvoiceRequest = async (req, res) => {
         }
         let approvedlist = [];
         if (userData && typeof userData === "object" && "approvedlist" in userData) {
-            approvedlist = userData.listOfAprroved;
+            approvedlist = userData.approvedlist;
         }
         approvedlist.push({
             adref: invoiceData.advertiseRef,
