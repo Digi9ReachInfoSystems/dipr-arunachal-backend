@@ -290,7 +290,7 @@ export const createNoteSheet = async (req: Request, res: Response) => {
 
         //Increment admin notesheet number
         await updateDoc(adminRef, {
-            notesheetno: noteSheetNo + 1
+            notesheetno: noteSheetNo 
         });
         const updatedData = (await getDoc(adminRef)).data();
         //create action log
