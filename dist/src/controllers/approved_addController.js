@@ -223,7 +223,7 @@ export const createNoteSheet = async (req, res) => {
         //send mail to department
         //Increment admin notesheet number
         await updateDoc(adminRef, {
-            notesheetno: noteSheetNo + 1
+            notesheetno: noteSheetNo
         });
         const updatedData = (await getDoc(adminRef)).data();
         //create action log
