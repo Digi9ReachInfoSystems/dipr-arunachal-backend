@@ -314,7 +314,7 @@ export const createInvoice = async (req: Request, res: Response) => {
         const usersEmailData = userEmailDocSnap.data();
         const toMail = usersEmailData["ddipradvtgmailcom"];
         try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/ro-status`, {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/bill-raised`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
