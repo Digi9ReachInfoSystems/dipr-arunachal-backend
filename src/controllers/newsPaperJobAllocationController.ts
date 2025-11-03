@@ -417,7 +417,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
             user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
             islogin: false,
             rodocref: docRef,
-            ronumber: data.roNumber,
+            ronumber: data.ronumber,
             old_data: data,
             edited_data: {
                 ...data,
@@ -483,7 +483,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
             user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
             islogin: false,
             rodocref: docRef,
-            ronumber: data.roNumber,
+            ronumber: data.ronumber,
             old_data: oldAddData || {},
             edited_data: updatedAdData || {},
             user_role,
@@ -529,7 +529,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
                 body: JSON.stringify({
                     to: toMail,
                     // to: "jayanthbr@digi9.co.in",
-                    roNumber: data.roNumber,
+                    roNumber: data.ronumber,
                     vendorName: userData.display_name,
                     vendorContact: userData.email,
                     result: "accepted",
@@ -607,7 +607,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
                 body: JSON.stringify({
                     to: adData.Bearingno,
                     // to: "jayanthbr@digi9.co.in",
-                    roNumber: data.roNumber,
+                    roNumber: data.ronumber,
                     vendorName: userData.display_name,
                     vendorContact: userData.email,
                 }),
@@ -679,7 +679,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
             user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
             islogin: false,
             rodocref: docRef,
-            ronumber: data.roNumber,
+            ronumber: data.ronumber,
             old_data: {},
             edited_data: {
 
@@ -710,7 +710,7 @@ export const approveNewspaperJobAllocationByVendor = async (req: Request, res: R
             user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
             islogin: false,
             rodocref: docRef,
-            ronumber: data.roNumber,
+            ronumber: data.ronumber,
             old_data: {},
             edited_data: {
 
