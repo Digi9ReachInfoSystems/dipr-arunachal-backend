@@ -105,11 +105,11 @@ export const createNoteSheet = async (req, res) => {
         const approved_addRef = doc(approved_addCollection);
         let division;
         let invoice;
-        if (userData.IsLdc1) {
+        if (userData.isLdc1) {
             division = 1;
             invoice = 'UDC - 2';
         }
-        else if (userData.IsLdc2) {
+        else if (userData.isLdc2) {
             division = 2;
             invoice = 'LDC - 1';
         }
