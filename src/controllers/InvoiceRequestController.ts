@@ -2360,7 +2360,7 @@ export const invoiceNoteSheetAcknowledgeDirector = async (req: Request, res: Res
             edited_data: updatedData || {},
             user_role,
             action: 12,
-            message: `Invoice Request Approve  by Director updated approved add document path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by FAO updated approved add document path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: req.ip || null,
@@ -2411,7 +2411,7 @@ export const invoiceNoteSheetAcknowledgeDirector = async (req: Request, res: Res
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Approve  by Deputy mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Approve  by FAO mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Success",
                     platform: platform,
                     networkip: req.ip || null,
@@ -2438,7 +2438,7 @@ export const invoiceNoteSheetAcknowledgeDirector = async (req: Request, res: Res
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Approve  by Director  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Approve  by FAO  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Failed",
                     platform: platform,
                     networkip: req.ip || null,
@@ -2471,7 +2471,7 @@ export const invoiceNoteSheetAcknowledgeDirector = async (req: Request, res: Res
             edited_data: {},
             user_role,
             action: 300,
-            message: `Invoice Request Approve  by Director Successfull path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by FAO Successfull path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: req.ip || null,
@@ -2503,7 +2503,7 @@ export const invoiceNoteSheetAcknowledgeDirector = async (req: Request, res: Res
             edited_data: {},
             user_role,
             action: 300,
-            message: `Invoice Request Approve  by Director Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by FAO Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
             status: "Failed",
             platform: platform,
             networkip: req.ip || null,
@@ -3481,7 +3481,7 @@ export const invoiceNoteSheetRejectDirector = async (req: Request, res: Response
             edited_data: updatedData || {},
             user_role,
             action: 10,
-            message: `Invoice Request Reject  by Director updated approved add document path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Reject  by FAO updated approved add document path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -3551,7 +3551,7 @@ export const invoiceNoteSheetRejectDirector = async (req: Request, res: Response
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Reject  by Deputy mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Reject  by FAO mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Success",
                     platform: platform,
                     networkip: clientIp || null,
@@ -3578,7 +3578,7 @@ export const invoiceNoteSheetRejectDirector = async (req: Request, res: Response
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Reject  by Director  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Reject  by FAO  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Failed",
                     platform: platform,
                     networkip: clientIp || null,
@@ -3611,7 +3611,7 @@ export const invoiceNoteSheetRejectDirector = async (req: Request, res: Response
             edited_data: {},
             user_role,
             action: 301,
-            message: `Invoice Request Reject  by Director Successfull path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Reject  by FAO Successfull path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -3628,7 +3628,7 @@ export const invoiceNoteSheetRejectDirector = async (req: Request, res: Response
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess })
 
-        res.status(200).json({ success: true, message: "Invoice Request Reject  by Director successfully" });
+        res.status(200).json({ success: true, message: "Invoice Request Reject  by FAO successfully" });
 
 
     } catch (error: Error | any) {
@@ -3643,7 +3643,7 @@ export const invoiceNoteSheetRejectDirector = async (req: Request, res: Response
             edited_data: {},
             user_role,
             action: 301,
-            message: `Invoice Request Reject  by Director Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Reject  by FAO Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
             status: "Failed",
             platform: platform,
             networkip: clientIp || null,
@@ -4270,7 +4270,7 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
             edited_data: updatedData || {},
             user_role,
             action: 12,
-            message: `Invoice Request Reject  by FAO updated approved add document path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Reject  by Director updated approved add document path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -4344,7 +4344,7 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Reject  by FAO mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Reject  by Director mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Success",
                     platform: platform,
                     networkip: clientIp || null,
@@ -4371,7 +4371,7 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Reject  by FAO  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Reject  by Director  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Failed",
                     platform: platform,
                     networkip: clientIp || null,
@@ -4405,7 +4405,7 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
             edited_data: {},
             user_role,
             action: 400,
-            message: `Invoice Request Reject  by FAO Successfull  path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Reject  by Director Successfull  path: /invoiceRequest${req.path}`,
             status: "Failed",
             platform: platform,
             networkip: clientIp || null,
@@ -4437,7 +4437,7 @@ export const invoiceNoteSheetRejectFao = async (req: Request, res: Response) => 
             edited_data: {},
             user_role,
             action: 400,
-            message: `Invoice Request Reject  by FAO Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Reject  by Director Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
             status: "Failed",
             platform: platform,
             networkip: clientIp || null,
@@ -4527,7 +4527,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
             edited_data: updatedData || {},
             user_role,
             action: 12,
-            message: `Invoice Request Approve  by FAO for selecting LDC/UDC updated approved add document path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by Director for selecting LDC/UDC updated approved add document path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -4573,7 +4573,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
             edited_data: updatedAdminData || {},
             user_role,
             action: 15,
-            message: `Invoice Request Approve  by FAO for selecting LDC/UDC updated admindata document path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by Director for selecting LDC/UDC updated admindata document path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -4640,7 +4640,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Approve  by FAO for selecting LDC/UDC mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Approve  by Director for selecting LDC/UDC mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Success",
                     platform: platform,
                     networkip: clientIp || null,
@@ -4667,7 +4667,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Approve  by FAO for selecting LDC/UDC  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Approve  by Director for selecting LDC/UDC  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Failed",
                     platform: platform,
                     networkip: clientIp || null,
@@ -4718,7 +4718,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Approve  by FAO for selecting LDC/UDC mail sent successfully to department  ${toMailTwo} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Approve  by Director for selecting LDC/UDC mail sent successfully to department  ${toMailTwo} path: /invoiceRequest${req.path}`,
                     status: "Success",
                     platform: platform,
                     networkip: clientIp || null,
@@ -4745,7 +4745,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Approve  by FAO for selecting LDC/UDC  mail failed to send to department ${toMailTwo} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Approve  by Director for selecting LDC/UDC  mail failed to send to department ${toMailTwo} path: /invoiceRequest${req.path}`,
                     status: "Failed",
                     platform: platform,
                     networkip: clientIp || null,
@@ -4778,7 +4778,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
             edited_data: {},
             user_role,
             action: 401,
-            message: `Invoice Request Approve  by FAO for selecting LDC/UDC Successfull path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by Director for selecting LDC/UDC Successfull path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -4795,7 +4795,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess })
 
-        res.status(200).json({ success: true, message: "Invoice Request Approve  by FAO for selecting LDC/UDC successfully" });
+        res.status(200).json({ success: true, message: "Invoice Request Approve  by Director for selecting LDC/UDC successfully" });
 
 
     } catch (error: Error | any) {
@@ -4810,7 +4810,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
             edited_data: {},
             user_role,
             action: 401,
-            message: `Invoice Request Approve  by FAO for selecting LDC/UDC Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by Director for selecting LDC/UDC Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
             status: "Failed",
             platform: platform,
             networkip: clientIp || null,
@@ -4896,7 +4896,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req: Reque
             edited_data: updatedData || {},
             user_role,
             action: 12,
-            message: `Invoice Request Approve  by FAO for selecting Undersecretary updated approved add document path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by Director for selecting Undersecretary updated approved add document path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -4951,7 +4951,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req: Reque
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Approve  by FAO for selecting Undersecretary mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Approve  by Director for selecting Undersecretary mail sent successfully to department  ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Success",
                     platform: platform,
                     networkip: clientIp || null,
@@ -4978,7 +4978,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req: Reque
                     edited_data: {},
                     user_role,
                     action: 4,
-                    message: `Invoice Request Approve  by FAO for selecting Undersecretary  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
+                    message: `Invoice Request Approve  by Director for selecting Undersecretary  mail failed to send to department ${toMail} path: /invoiceRequest${req.path}`,
                     status: "Failed",
                     platform: platform,
                     networkip: clientIp || null,
@@ -5012,7 +5012,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req: Reque
             edited_data: {},
             user_role,
             action: 402,
-            message: `Invoice Request Approve  by FAO for selecting Undersecretary Successfull path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by Director for selecting Undersecretary Successfull path: /invoiceRequest${req.path}`,
             status: "Success",
             platform: platform,
             networkip: clientIp || null,
@@ -5029,7 +5029,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req: Reque
         });
         await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess })
 
-        res.status(200).json({ success: true, message: "Invoice Request Approve  by FAO for selecting Undersecretary successfully" });
+        res.status(200).json({ success: true, message: "Invoice Request Approve  by Director for selecting Undersecretary successfully" });
 
 
     } catch (error: Error | any) {
@@ -5044,7 +5044,7 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req: Reque
             edited_data: {},
             user_role,
             action: 402,
-            message: `Invoice Request Approve  by FAO for selecting Undersecretary Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
+            message: `Invoice Request Approve  by Director for selecting Undersecretary Failed Error: ${error.message} path: /invoiceRequest${req.path}`,
             status: "Failed",
             platform: platform,
             networkip: clientIp || null,
