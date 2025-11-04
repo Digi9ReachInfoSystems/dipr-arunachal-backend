@@ -1649,8 +1649,9 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
   // 🔹 Prepare data
   const adRef = doc(db, "Advertisement", advertisementId);
   const adSnap = await getDoc(adRef);
-  if (!adSnap.exists()) throw new Error("Advertisement not found");
   oldData = adSnap.data();
+  if (!adSnap.exists()) throw new Error("Advertisement not found");
+  
 
   const jobLogicSnap = await getDocs(collection(db, "joblogic"));
   if (jobLogicSnap.empty) throw new Error("Joblogic not found");
@@ -1801,15 +1802,30 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
     }
     const advertisementNumber = adSnap.data().AdvertisementId || "";
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+      // const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({
+      //     to,
+      //     // to: "jayanthbr@digi9.co.in",
+      //     advertisementNumber,
+      //     cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
+      //     listOfNewspapers: newsPaperList,
+      //   }),
+      // });
+      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/approval-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to,
           // to: "jayanthbr@digi9.co.in",
-          advertisementNumber,
-          cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
-          listOfNewspapers: newsPaperList,
+          roNumber: advertisementNumber,
+          // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
+          // listOfNewspapers: newsPaperList,
+          articleTitle:adSnap.data().Subject || '',
+ 
+
+ 
         }),
       });
       if (response.status == 200) {
