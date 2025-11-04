@@ -724,7 +724,7 @@ export const automaticAllocationSendToNewspaper = async (req, res) => {
                     to,
                     // to: "jayanthbr@digi9.co.in",
                     advertisementNumber,
-                    cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+                    cc: "diprarunadvt@gmail.com", //diprarunx@gmail.com,diprarunpub@gmail.com
                     listOfNewspapers: newsPaperList,
                 }),
             });
@@ -1080,7 +1080,7 @@ export const manualAllocationSendToNewspaper = async (req, res) => {
                     to,
                     // to: "jayanthbr@digi9.co.in",
                     advertisementNumber,
-                    cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+                    cc: "diprarunadvt@gmail.com", //diprarunx@gmail.com,diprarunpub@gmail.com
                     listOfNewspapers: newsPaperList,
                 }),
             });
@@ -1369,7 +1369,7 @@ export const automaticAllocationSendToDeputy = async (req, res) => {
                     to,
                     // to: "jayanthbr@digi9.co.in",
                     advertisementNumber,
-                    cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+                    cc: "diprarunadvt@gmail.com", //diprarunx@gmail.com,diprarunpub@gmail.com
                     listOfNewspapers: newsPaperList,
                 }),
             });
@@ -1669,7 +1669,7 @@ export const manualAllocationSendToDeputy = async (req, res) => {
                     to,
                     // to: "jayanthbr@digi9.co.in",
                     advertisementNumber,
-                    cc: process.env.CC_MAIL,
+                    cc: "diprarunadvt@gmail.com", //diprarunx@gmail.com,diprarunpub@gmail.com
                     listOfNewspapers: newsPaperList,
                 }),
             });
@@ -2293,7 +2293,7 @@ export const deputyApproveAdvertisement = async (req, res) => {
                     // to: "jayanthbr@digi9.co.in",
                     advertisementNumber: data.AdvertisementId,
                     // cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
-                    cc: process.env.CC_MAIL,
+                    cc: "diprarunadvt@gmail.com", //diprarunx@gmail.com,diprarunpub@gmail.com
                     listOfNewspapers: newsPaperList,
                 }),
             });
