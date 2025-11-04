@@ -890,7 +890,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                     body: JSON.stringify({
                         to: toMail,
                         // to: "jayanthbr@digi9.co.in",
-                        roNumber: data.roNumber,
+                        roNumber: data.ronumber,
                         vendorName: userData.display_name,
                         vendorContact: userData.email,
                         result: "rejected (manually allocated)",
@@ -967,7 +967,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                     body: JSON.stringify({
                         to: toMailTwo,
                         // to: "jayanthbr@digi9.co.in",
-                        roNumber: data.roNumber,
+                        roNumber:  data.ronumber,
                         vendorName: userData.display_name,
                         vendorContact: userData.email,
                         result: "rejected (manually allocated)",
@@ -1239,7 +1239,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                     body: JSON.stringify({
                         to: toMail,
                         // to: "jayanthbr@digi9.co.in",
-                        roNumber: data.roNumber,
+                        roNumber: data.ronumber,
                         vendorName: userData.display_name,
                         vendorContact: userData.email,
                         result: "rejected (manually allocated)",
@@ -1317,7 +1317,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
                     body: JSON.stringify({
                         to: toMailTwo,
                         // to: "jayanthbr@digi9.co.in",
-                        roNumber: data.roNumber,
+                        roNumber:  data.ronumber,
                         vendorName: userData.display_name,
                         vendorContact: userData.email,
                         result: "rejected (manually allocated)",
@@ -1400,7 +1400,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
             user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
             islogin: false,
             rodocref: docRef,
-            ronumber: data.roNumber,
+            ronumber:  data.ronumber,
             old_data: data,
             edited_data: newData || {},
             user_role,
@@ -1433,7 +1433,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req: Request, res: Re
             user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
             islogin: false,
             rodocref: docRef,
-            ronumber: data.roNumber,
+            ronumber:  data.ronumber,
             old_data: data,
             edited_data: {},
             user_role,
