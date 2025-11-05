@@ -1264,7 +1264,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
         Newspaper_allocation: {
           Newspaper: allotednewspapers as unknown as DocumentReference<DocumentData>[],
           allotedtime: new Date(),
-          allocation_type: AllocationType.AUTOMATIC,
+          allocation_type: AllocationType.MANUAL,
           allotedby: user_ref ? doc(db, "Users", user_ref) : null,
         },
         adRef: allocRef,
@@ -1910,7 +1910,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
         Newspaper_allocation: {
           Newspaper: allotednewspapers,
           allotedtime: new Date(),
-          allocation_type: AllocationType.AUTOMATIC,
+          allocation_type: AllocationType.MANUAL,
           allotedby: user_ref ? doc(db, "Users", user_ref) : null,
         },
         adRef: allocRef,
