@@ -1482,7 +1482,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
     }
     const advertisementNumber = adSnap.data().AdvertisementId || "";
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2806,7 +2806,7 @@ export const deputyRejectAdvertisement = async (req: Request, res: Response) => 
       success: false,
       message: "User not found",
     });
-  }
+  } 
   const userData = userSnapshot.data();
   if (!userData) {
     return res.status(404).json({
