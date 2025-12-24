@@ -1708,7 +1708,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
         approvedstatus: 0,
         updatedAt: serverTimestamp(),
         Release_order_no: `DIPR/ARN/${ronumbers}`,
-        IsrequesPending: false,
+        IsrequesPending: true,
         manuallyallotted: true,
       });
 
