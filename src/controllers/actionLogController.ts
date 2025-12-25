@@ -99,7 +99,7 @@ export const createActionLog = async (req: Request, res: Response) => {
     }
 
     const log = new ActionLog(body);
-    log.networkip =clientIp || null;
+    log.networkip = clientIp || null;
 
     const docRef = await addDoc(actionLogsRef, { ...log });
     res.status(201).json({ success: true, message: "ActionLog created", id: docRef.id });
@@ -215,7 +215,7 @@ export const getAllActionLogs = async (req: Request, res: Response) => {
       constraints.push(where("user_role", "==", String(user_role)));
     }
     console.log("action", action);
-    if (action && action !== "0"&& Number(action)!==0) {
+    if (action && action !== "0" && Number(action) !== 0) {
       constraints.push(where("action", "==", Number(action)));
     }
 
