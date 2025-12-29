@@ -28,6 +28,18 @@ import { Buffer } from "buffer";
 import { Timestamp } from "firebase/firestore";
 import PdfPrinter from "pdfmake";
 import type { TDocumentDefinitions } from "pdfmake/interfaces.js";
+import path from "path";
+interface UserNotification {
+  to: string;
+  roNumber: string;
+  addressTo: string;
+}
+
+interface VendorNotification {
+  roNumber: string;
+  result: string;
+  resultComment: string;
+}
 export const createAdvertisement = async (req: Request, res: Response) => {
   try {
 
@@ -123,6 +135,7 @@ export const createAdvertisement = async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       id: docRef.id,
+      path: `/Advertisement/${docRef.id}`,
       data: payload,
       actionLogId: actionLogRef.id,
     });
@@ -1485,7 +1498,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
           to,
           // to: "jayanthbr@digi9.co.in",
           advertisementNumber,
-          cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+          cc:process.env.CC_MAIL,
           listOfNewspapers: newsPaperList,
         }),
       });
@@ -1812,6 +1825,366 @@ export const getAdvertisementCountByYear = async (req: Request, res: Response) =
 
   } catch (error: Error | any) {
     console.error("❌ Error fetching advertisement count:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+export const deputyApproveAdvertisement = async (req: Request, res: Response) => {
+  const { advertisementId, user_ref, user_role, platform, screen, } = req.body;
+  const adRef = doc(db, "Advertisement", advertisementId);
+
+  try {
+    const ad = await getDoc(adRef);
+    if (!ad.exists()) {
+      return res.status(404).json({ success: false, message: "Advertisement not found" });
+    }
+    const data = ad.data();
+
+    await updateDoc(adRef, {
+      allotednewspapers: data.caseworkerdraftnewspapers || [],
+      IsrequesPending: false,
+      Status_Deputy: 2,
+      approved: true,
+      DateOfApproval: serverTimestamp(),
+      approvedstatus: 1,
+      RODATE: serverTimestamp(),
+
+    });
+    const updatedSnap = await getDoc(adRef);
+    const updatedData = updatedSnap.data();
+    // create action Log
+    const actionLog = new ActionLog({
+      user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+      islogin: false,
+      rodocref: null,
+      ronumber: null,
+      old_data: data,
+      edited_data: updatedData ?? {},
+      user_role: req.body.user_role || "",
+      action: 7,
+      message: `Advertisement approved by Deputy`,
+      status: "Success",
+      platform: req.body.platform,
+      networkip: req.ip || null,
+      screen: req.body.screen,
+      Newspaper_allocation: {
+        Newspaper: [],
+        allotedtime: null,
+        allocation_type: null,
+        allotedby: null,
+      },
+      actiontime: moment().tz("Asia/Kolkata").toDate(),
+      adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
+    });
+    await addDoc(collection(db, "actionLogs"), { ...actionLog });
+
+    const ListOfNewsPapperJobAllocationDocRef: DocumentReference[] = [];
+    const jobAllocSnap = await getDocs(
+      query(
+        collection(db, "NewspaperJobAllocation"),
+        where("adref", "==", adRef)
+      )
+    );
+    jobAllocSnap.forEach((doc) => {
+      ListOfNewsPapperJobAllocationDocRef.push(doc.ref);
+    });
+    const notifications: UserNotification[] = [];
+    const notificationApproved: VendorNotification[] = [];
+    const newsPaperList: string[] = [];
+    for (const docRef of ListOfNewsPapperJobAllocationDocRef) {
+      const oldSnap = await getDoc(docRef);
+      const old_data = oldSnap.data();
+      await updateDoc(docRef, {
+        aprovedcw: true,
+        timeofallotment: serverTimestamp(),
+        completed: false,
+        invoiceraised: false,
+      });
+      const newSnap = await getDoc(docRef);
+      const new_data = newSnap.data();
+      // create action Log
+      const actionLog = new ActionLog({
+        user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+        islogin: false,
+        rodocref: docRef.id ? doc(db, "NewspaperJobAllocation", docRef.id) : null,
+        ronumber: null,
+        old_data: old_data ?? {},
+        edited_data: new_data ?? {},
+        user_role: req.body.user_role || "",
+        action: 7,
+        message: `Advertisement approved by Deputy`,
+        status: "Success",
+        platform: req.body.platform,
+        networkip: req.ip || null,
+        screen: req.body.screen,
+        Newspaper_allocation: {
+          Newspaper: [],
+          allotedtime: null,
+          allocation_type: null,
+          allotedby: null,
+        },
+        actiontime: moment().tz("Asia/Kolkata").toDate(),
+        adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
+      });
+      await addDoc(collection(db, "actionLogs"), { ...actionLog });
+
+      const allocationSnap = await getDoc(docRef);
+      if (allocationSnap.exists()) {
+        const allocationData = allocationSnap.data();
+        const roNumber: string | undefined = allocationData.ronumber;
+        const userRef: DocumentReference<DocumentData> | undefined =
+          allocationData.newspaperrefuserref;
+
+        if (userRef) {
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            const userData = userSnap.data() as { email?: string; display_name?: string };
+            const userEmail = userData.email;
+            const paperName = userData.display_name;
+
+            if (paperName) {
+              newsPaperList.push(paperName);
+            }
+            if (userEmail && roNumber) {
+              notifications.push({
+                to: userEmail,
+                roNumber,
+                addressTo: "Technical Assistant",
+              });
+              notificationApproved.push({
+                roNumber,
+                result: "approved",
+                resultComment: "and sent for approval to the vendor.",
+              });
+            }
+          }
+        }
+      }
+
+    }
+
+    // Send mail to users
+    for (const mail of notifications) {
+      try {
+        await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(mail),
+        });
+        console.log(`Email sent to ${mail.to}`);
+      } catch (err: any) {
+        console.error(`Failed to send email to ${mail.to}:`, err.message);
+      }
+    }
+
+    // Send mail to vendor
+    const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+    if (!usersEmailSnap.empty) {
+      const docSnap = usersEmailSnap.docs[0];
+      if (!docSnap) {
+        throw new Error("UsersEmail document does not exist");
+      }
+      const usersEmailData = docSnap.data();
+      const toMail = usersEmailData["technicalassistantadvtgmailcom"];
+
+      for (const mail of notificationApproved) {
+        try {
+          await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: toMail,
+              roNumber: mail.roNumber,
+              result: mail.result,
+              resultComment: mail.resultComment,
+            }),
+          });
+          console.log(`Accepting email sent to ${toMail} for RO ${mail.roNumber}`);
+        } catch (err: any) {
+          console.error(`Failed to send accepting email to ${toMail}:`, err.message);
+        }
+      }
+    }
+
+    // Send mail to department
+    try {
+      await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to:data.Bearingno,
+          // to: "jayanthbr@digi9.co.in",
+          advertisementNumber: data.AdvertisementId,
+          // cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+          cc:process.env.CC_MAIL,
+          listOfNewspapers: newsPaperList,
+        }),
+      });
+      console.log(`Email sent to department`, data.Bearingno);
+    } catch (err: Error | any) {
+      console.error(`Failed to send email to ${data.Bearingno}:`, err.message);
+    }
+    res.status(200).json({ success: true, message: "Advertisement approved and notifications sent.", Adevertisement: data, notifications, notificationApproved, ListOfNewsPapperJobAllocationDocRef });
+
+  } catch (error: Error | any) {
+    // create action Log
+    const actionLog = new ActionLog({
+      user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+      islogin: false,
+      rodocref: null,
+      ronumber: null,
+      old_data: {},
+      edited_data: {},
+      user_role: req.body.user_role || "",
+      action: 7,
+      message: `Error while approving advertisement: ${error.message}`,
+      status: "Failed",
+      platform: req.body.platform,
+      networkip: req.ip || null,
+      screen: req.body.screen,
+      Newspaper_allocation: {
+        Newspaper: [],
+        allotedtime: null,
+        allocation_type: null,
+        allotedby: null,
+      },
+      actiontime: moment().tz("Asia/Kolkata").toDate(),
+      adRef: adRef,
+    });
+    await addDoc(collection(db, "actionLogs"), { ...actionLog });
+    console.error("❌ Error approving advertisement:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const deputyPullBackAction = async (req: Request, res: Response) => {
+  const { advertisementId, user_ref, user_role, platform, screen } = req.body;
+  const adRef = doc(db, "Advertisement", advertisementId);
+  try {
+    const ad = await getDoc(adRef);
+    if (!ad.exists()) {
+      return res.status(404).json({ success: false, message: "Advertisement not found" });
+    }
+    const data = ad.data();
+
+    await updateDoc(adRef, {
+      allotednewspapers:  [],
+      IsrequesPending: false,
+      Status_Deputy: 0,
+      approved: false,
+      caseworkerdraftnewspapers:data.allotednewspapers,
+    });
+    const updatedSnap = await getDoc(adRef);
+    const updatedData = updatedSnap.data();
+    // create action Log
+    const actionLog = new ActionLog({
+      user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+      islogin: false,
+      rodocref: null,
+      ronumber: null,
+      old_data: data,
+      edited_data: updatedData ?? {},
+      user_role: req.body.user_role || "",
+      action: 7,
+      message: `PullBack operation performed by Deputy on advertisement: ${advertisementId}`,
+      status: "Success",
+      platform: req.body.platform,
+      networkip: req.ip || null,
+      screen: req.body.screen,
+      Newspaper_allocation: {
+        Newspaper: [],
+        allotedtime: null,
+        allocation_type: null,
+        allotedby: null,
+      },
+      actiontime: moment().tz("Asia/Kolkata").toDate(),
+      adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
+    });
+    await addDoc(collection(db, "actionLogs"), { ...actionLog });
+
+    const ListOfNewsPapperJobAllocationDocRef: DocumentReference[] = [];
+    const jobAllocSnap = await getDocs(
+      query(
+        collection(db, "NewspaperJobAllocation"),
+        where("adref", "==", adRef)
+      )
+    );
+    jobAllocSnap.forEach((doc) => {
+      ListOfNewsPapperJobAllocationDocRef.push(doc.ref);
+    });
+    const notifications: UserNotification[] = [];
+    const notificationApproved: VendorNotification[] = [];
+    const newsPaperList: string[] = [];
+    for (const docRef of ListOfNewsPapperJobAllocationDocRef) {
+      const oldSnap = await getDoc(docRef);
+      const old_data = oldSnap.data();
+      await updateDoc(docRef, {
+        aprovedcw: false,
+        completed: false,
+      });
+      const newSnap = await getDoc(docRef);
+      const new_data = newSnap.data();
+      // create action Log
+      const actionLog = new ActionLog({
+        user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+        islogin: false,
+        rodocref: docRef.id ? doc(db, "NewspaperJobAllocation", docRef.id) : null,
+        ronumber: null,
+        old_data: old_data ?? {},
+        edited_data: new_data ?? {},
+        user_role: req.body.user_role || "",
+        action: 7,
+        message: `PullBack operation performed by Deputy on advertisement: ${advertisementId} and NewspaperJobAllocation: ${docRef.id}`,
+        status: "Success",
+        platform: req.body.platform,
+        networkip: req.ip || null,
+        screen: req.body.screen,
+        Newspaper_allocation: {
+          Newspaper: [],
+          allotedtime: null,
+          allocation_type: null,
+          allotedby: null,
+        },
+        actiontime: moment().tz("Asia/Kolkata").toDate(),
+        adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
+      });
+      await addDoc(collection(db, "actionLogs"), { ...actionLog });
+
+    }
+    res.status(200).json({ 
+      success: true, 
+      message: "PullBack operation performed successfully",
+      data: updatedData
+      
+     });
+  } catch (error: Error | any) {
+
+    const actionLog = new ActionLog({
+      user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+      islogin: false,
+      rodocref: null,
+      ronumber: null,
+      old_data: {},
+      edited_data: {},
+      user_role: req.body.user_role || "",
+      action: 7,
+      message: `Error while performing PullBack operation performed by Deputy on advertisement: ${error.message}`,
+      status: "Failed",
+      platform: req.body.platform,
+      networkip: req.ip || null,
+      screen: req.body.screen,
+      Newspaper_allocation: {
+        Newspaper: [],
+        allotedtime: null,
+        allocation_type: null,
+        allotedby: null,
+      },
+      actiontime: moment().tz("Asia/Kolkata").toDate(),
+      adRef: adRef,
+    });
+    await addDoc(collection(db, "actionLogs"), { ...actionLog });
+    console.error("❌ Error approving advertisement:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
