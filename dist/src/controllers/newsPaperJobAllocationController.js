@@ -990,7 +990,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                             vendorContact: userData.email,
                             result: "rejected (manually allocated)",
                             resultComment: "Please review the feedback provided.",
-                            addressTo: "ADVT Cell"
+                            addressTo: "Deputy Director "
                         }),
                     });
                     if (response.status == 200) {
@@ -1314,7 +1314,7 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                             roNumber: data.ronumber,
                             vendorName: userData.display_name,
                             vendorContact: userData.email,
-                            result: "rejected (manually allocated)",
+                            result: "rejected ",
                             resultComment: "Please review the feedback provided.",
                             addressTo: "ADVT Cell"
                         }),
@@ -1420,9 +1420,9 @@ export const rejectNewspaperJobAllocationByVendor = async (req, res) => {
                             roNumber: data.ronumber,
                             vendorName: userData.display_name,
                             vendorContact: userData.email,
-                            result: "rejected (manually allocated)",
+                            result: "rejected ",
                             resultComment: "Please review the feedback provided.",
-                            addressTo: "ADVT Cell"
+                            addressTo: "Deputy Director "
                         }),
                     });
                     if (response.status == 200) {
