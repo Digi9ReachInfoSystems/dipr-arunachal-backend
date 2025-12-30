@@ -5320,7 +5320,7 @@ export const invoiceNoteSheetRejectIsSc = async (req: Request, res: Response) =>
                     message: "Email not found",
                 });
             }
-            const cc = `${usersEmailData["faoiprgmailcom"]},${usersEmailData["ddipradvtgmailcom"]},${thirdCC}`;
+            const cc = `${usersEmailData["faoiprgmailcom"]},${usersEmailData["ddipradvtgmailcom"]},${usersEmailData["dyauniprgmailcom"]},${thirdCC}`;
             try {
                 const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/notesheetRejected`, {
                     method: "POST",
@@ -6177,7 +6177,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
                         to: toMailTwo,
                         // to: "jayanthbr@digi9.co.in",
                         notesheetNumber: approvedAdData.notesheetString,
-                        addressTo: "FAO",
+                        addressTo: "Deputy Director",
                         result: "accepted.",
                         cc: cc,
                     }),
