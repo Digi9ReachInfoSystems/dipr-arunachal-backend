@@ -1661,10 +1661,18 @@ export const automaticAllocationSendToDeputy = async (req, res) => {
                     body: JSON.stringify({
                         to,
                         // to: "jayanthbr@digi9.co.in",
+<<<<<<< HEAD
                         advertisementNumber,
                         // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
                         cc: process.env.CC_MAIL,
                         listOfNewspapers: newsPaperList,
+=======
+                        roNumber: advertisementNumber,
+                        // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
+                        cc: process.env.CC_MAIL,
+                        listOfNewspapers: newsPaperList,
+                        addressTo: "Technical Assistant",
+>>>>>>> development
                     }),
                 });
                 if (response.status == 200) {
