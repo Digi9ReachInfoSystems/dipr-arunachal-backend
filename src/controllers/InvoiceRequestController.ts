@@ -6177,7 +6177,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
                         to: toMailTwo,
                         // to: "jayanthbr@digi9.co.in",
                         notesheetNumber: approvedAdData.notesheetString,
-                        addressTo: "Deputy Director",
+                        addressTo: "FAO",
                         result: "accepted.",
                         cc: cc,
                     }),
@@ -6244,7 +6244,7 @@ export const invoiceNoteSheetAcknowledgeFAOForLDCUDC = async (req: Request, res:
                             body: JSON.stringify({
                                 to: process.env.FAILED_LOG_TO_MAIL,
                                 cc: process.env.FAILED_LOG_CC_MAIL,
-                                actionName: "IInvoice Request Approve  by Director for selecting LDC/UDC  Mail failed",
+                                actionName: "Invoice Request Approve  by Director for selecting LDC/UDC  Mail failed",
                                 actionEndpoint: `/invoiceRequest${req.path}`,
                                 ErrorInfo: {
                                     message: `Invoice Request Approve  by Director for selecting LDC/UDC  mail failed to send to department ${toMailTwo} path: /invoiceRequest${req.path}`,
