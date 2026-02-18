@@ -18,4 +18,5 @@ export declare const invoiceNoteSheetRejectIsSc: (req: Request, res: Response) =
 export declare const invoiceNoteSheetRejectFao: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const invoiceNoteSheetAcknowledgeFAOForLDCUDC: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 export declare const invoiceNoteSheetAcknowledgeFAOForUnderSecretary: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
+export declare const deputyInvoiceReject: (req: Request, res: Response) => Promise<Response<any, Record<string, any>> | undefined>;
 //# sourceMappingURL=InvoiceRequestController.d.ts.map
