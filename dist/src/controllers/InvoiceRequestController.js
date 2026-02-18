@@ -6395,4 +6395,326 @@ export const invoiceNoteSheetAcknowledgeFAOForUnderSecretary = async (req, res) 
         });
     }
 };
+export const deputyInvoiceReject = async (req, res) => {
+    const { feedback, invoiceId, user_id, user_role, platform, screen } = req.body;
+    try {
+        //update invoice
+        const invoiceRef = doc(db, "Invoice_Request", invoiceId);
+        const invoiceSnapshot = await getDoc(invoiceRef);
+        if (!invoiceSnapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Invoice not found",
+            });
+        }
+        const invoiceData = invoiceSnapshot.data();
+        try {
+            await updateDoc(invoiceRef, {
+                deputydirecotor: feedback,
+                deputyDirector_status: 3,
+                // DateOfInvoice: serverTimestamp(),
+                // sendAgain: true,
+            });
+            const updatedData = (await getDoc(invoiceRef)).data();
+            // create action log
+            const actionLog = new ActionLog({
+                user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+                islogin: false,
+                rodocref: invoiceData.jobref,
+                ronumber: invoiceData.Ronumber,
+                docrefinvoice: invoiceRef,
+                old_data: invoiceData || {},
+                edited_data: updatedData || {},
+                user_role,
+                action: 10,
+                message: `Invoice Reject Action successfull by Deputy updated Invoice Request document path: /invoiceRequest${req.path}`,
+                status: "Success",
+                platform: platform,
+                networkip: req.ip || null,
+                screen: screen,
+                adRef: invoiceData.advertiseRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+                Newspaper_allocation: {
+                    Newspaper: [],
+                    allotedtime: null,
+                    allocation_type: null,
+                    allotedby: null
+                }
+            });
+            await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            //update Advertisement document
+            const adRef = invoiceData.advertiseRef;
+            const adSnapshot = await getDoc(adRef);
+            const addOldData = adSnapshot.data();
+            await updateDoc(adRef, {
+                Invoice_deputy: 3,
+            });
+            const updatedAdData = (await getDoc(adRef)).data();
+            // create action log
+            const actionLogAdd = new ActionLog({
+                user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+                islogin: false,
+                rodocref: invoiceData.jobref,
+                ronumber: invoiceData.Ronumber,
+                docrefinvoice: invoiceRef,
+                old_data: addOldData || {},
+                edited_data: updatedAdData || {},
+                user_role,
+                action: 6,
+                message: `Invoice Reject Action successfull by Deputy updated Advertisement Document path: /invoiceRequest${req.path}`,
+                status: "Success",
+                platform: platform,
+                networkip: req.ip || null,
+                screen: screen,
+                adRef: invoiceData.advertiseRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+                Newspaper_allocation: {
+                    Newspaper: [],
+                    allotedtime: null,
+                    allocation_type: null,
+                    allotedby: null
+                }
+            });
+            await addDoc(collection(db, "actionLogs"), { ...actionLogAdd });
+            //send mail to vendor
+            const userSnap = await getDoc(invoiceData.Userref);
+            const userData = userSnap.data();
+            if (!userData) {
+                return res.status(404).json({
+                    success: false,
+                    message: "User not found",
+                });
+            }
+            const toMail = (userData && typeof userData === "object" && "email" in userData) ? userData.email : "";
+            try {
+                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/BillRejectedDD`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        to: (userData && typeof userData === "object" && "email" in userData) ? userData.email : "",
+                        addressTo: (userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "",
+                        // to: "jayanthbr@digi9.co.in",
+                        roNumber: invoiceData.Ronumber,
+                        vendorName: "Deputy Director",
+                        vendorContact: (userData && typeof userData === "object" && "email" in userData) ? userData.email : "",
+                        reasonOfRejection: feedback
+                    }),
+                });
+                if (response.status == 200) {
+                    //create action log for mail sent
+                    const actionLog = new ActionLog({
+                        user_ref: user_id ? doc(db, "Users", user_id) : null,
+                        islogin: false,
+                        rodocref: invoiceData.jobref, // each allocation doc ref
+                        ronumber: invoiceData.Ronumber,
+                        docrefinvoice: invoiceRef,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 4,
+                        message: `Invoice Reject mail sent successfully to vendor  ${toMail} path: /invoiceRequest${req.path}`,
+                        status: "Success",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: adRef,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                }
+                else {
+                    const actionLog = new ActionLog({
+                        user_ref: user_id ? doc(db, "Users", user_id) : null,
+                        islogin: false,
+                        rodocref: invoiceData.jobref, // each allocation doc ref
+                        ronumber: invoiceData.Ronumber,
+                        docrefinvoice: invoiceRef,
+                        old_data: {},
+                        edited_data: {},
+                        user_role,
+                        action: 4,
+                        message: `Invoice Reject  mail failed to send to vendor ${toMail} path: /invoiceRequest${req.path}`,
+                        status: "Failed",
+                        platform: platform,
+                        networkip: req.ip || null,
+                        screen,
+                        Newspaper_allocation: {
+                            Newspaper: [],
+                            allotedtime: null,
+                            allocation_type: null,
+                            allotedby: null,
+                        },
+                        adRef: adRef,
+                        actiontime: moment().tz("Asia/Kolkata").toDate(),
+                    });
+                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+                    try {
+                        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                to: process.env.FAILED_LOG_TO_MAIL,
+                                cc: process.env.FAILED_LOG_CC_MAIL,
+                                actionName: " Invoice Reject Action by Deputy ",
+                                actionEndpoint: `/invoiceRequest${req.path}`,
+                                ErrorInfo: {
+                                    message: `Invoice Reject  mail failed to send to vendor ${toMail} path: /invoiceRequest${req.path}`,
+                                    error: null,
+                                },
+                                userInfo: {
+                                    uesrId: req.body.user_id,
+                                    role: req.body.user_role,
+                                    platform: req.body.platform,
+                                    screen: req.body.screen
+                                },
+                                OtherInfo: {
+                                    invoiceRef: invoiceId ? doc(db, "Invoice_Request", invoiceId) : null,
+                                }
+                            }),
+                        });
+                    }
+                    catch (e) {
+                        console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+                    }
+                }
+            }
+            catch (error) {
+                console.error("Error sending email:", error);
+            }
+            // create action log
+            const actionLogSuccess = new ActionLog({
+                user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+                islogin: false,
+                rodocref: invoiceData.jobref,
+                ronumber: invoiceData.Ronumber,
+                docrefinvoice: invoiceRef,
+                old_data: {},
+                edited_data: {},
+                user_role,
+                action: 209,
+                message: `Invoice Reject Action by Deputy Successfull path: /invoiceRequest${req.path}`,
+                status: "Success",
+                platform: platform,
+                networkip: req.ip || null,
+                screen: screen,
+                adRef: invoiceData.advertiseRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+                Newspaper_allocation: {
+                    Newspaper: [],
+                    allotedtime: null,
+                    allocation_type: null,
+                    allotedby: null
+                }
+            });
+            await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
+            res.status(200).json({
+                success: true,
+                message: "Invoice updated successfully",
+            });
+        }
+        catch (error) {
+            // create action log
+            const actionLog = new ActionLog({
+                user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
+                islogin: false,
+                rodocref: invoiceData.jobref,
+                ronumber: invoiceData.Ronumber,
+                docrefinvoice: invoiceRef,
+                old_data: {},
+                edited_data: {},
+                user_role,
+                action: 209,
+                message: `Invoice Reject Action by Deputy Failed error: ${error.message} path: /invoiceRequest${req.path}`,
+                status: "Failed",
+                platform: platform,
+                networkip: req.ip || null,
+                screen: screen,
+                adRef: invoiceData.advertiseRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+                Newspaper_allocation: {
+                    Newspaper: [],
+                    allotedtime: null,
+                    allocation_type: null,
+                    allotedby: null
+                }
+            });
+            await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            console.error("❌ Error updating invoice:", error);
+            try {
+                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        to: process.env.FAILED_LOG_TO_MAIL,
+                        cc: process.env.FAILED_LOG_CC_MAIL,
+                        actionName: " Invoice Reject Action by Deputy ",
+                        actionEndpoint: `/invoiceRequest${req.path}`,
+                        ErrorInfo: {
+                            message: error.message,
+                            error: error
+                        },
+                        userInfo: {
+                            uesrId: req.body.user_id,
+                            role: req.body.user_role,
+                            platform: req.body.platform,
+                            screen: req.body.screen
+                        },
+                        OtherInfo: {
+                            invoiceRef: invoiceId ? doc(db, "Invoice_Request", invoiceId) : null,
+                        }
+                    }),
+                });
+            }
+            catch (e) {
+                console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+            }
+            res.status(500).json({
+                success: false,
+                message: "Failed to update invoice",
+                error: error.message,
+            });
+        }
+    }
+    catch (e) {
+        try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to: process.env.FAILED_LOG_TO_MAIL,
+                    cc: process.env.FAILED_LOG_CC_MAIL,
+                    actionName: " Invoice Reject Action by Deputy ",
+                    actionEndpoint: `/invoiceRequest${req.path}`,
+                    ErrorInfo: {
+                        message: e.message,
+                        error: e
+                    },
+                    userInfo: {
+                        uesrId: req.body.user_id,
+                        role: req.body.user_role,
+                        platform: req.body.platform,
+                        screen: req.body.screen
+                    },
+                    OtherInfo: {
+                        invoiceRef: invoiceId ? doc(db, "Invoice_Request", invoiceId) : null,
+                    }
+                }),
+            });
+        }
+        catch (e) {
+            console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+        }
+        res.status(500).json({
+            success: false,
+            message: "Failed to update invoice",
+            error: e.message,
+        });
+    }
+};
 //# sourceMappingURL=InvoiceRequestController.js.map
