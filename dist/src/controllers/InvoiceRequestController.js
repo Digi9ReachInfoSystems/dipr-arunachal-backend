@@ -6412,6 +6412,7 @@ export const deputyInvoiceReject = async (req, res) => {
             await updateDoc(invoiceRef, {
                 deputydirecotor: feedback,
                 deputyDirector_status: 3,
+                isRead: false,
                 // DateOfInvoice: serverTimestamp(),
                 // sendAgain: true,
             });
