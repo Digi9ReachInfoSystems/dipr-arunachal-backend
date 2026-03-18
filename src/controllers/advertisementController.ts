@@ -3233,15 +3233,23 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
 
 export const deputyPullBackAction = async (req: Request, res: Response) => {
   const { advertisementId, user_ref, user_role, platform, screen } = req.body;
+
   try {
     const adRef = doc(db, "Advertisement", advertisementId);
     const xForwardedFor = req.headers["x-forwarded-for"];
-    const clientIp = typeof xForwardedFor === "string" ? xForwardedFor.split(",")[0] : undefined;
+    const clientIp =
+      typeof xForwardedFor === "string"
+        ? xForwardedFor.split(",")[0]
+        : undefined;
+
     try {
       const ad = await getDoc(adRef);
       if (!ad.exists()) {
-        return res.status(404).json({ success: false, message: "Advertisement not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Advertisement not found" });
       }
+
       const data = ad.data();
 
       await updateDoc(adRef, {
@@ -3251,23 +3259,25 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
         approved: false,
         caseworkerdraftnewspapers: data.allotednewspapers,
       });
+
       const updatedSnap = await getDoc(adRef);
       const updatedData = updatedSnap.data();
-      // create action Log
+
+      // action log for Advertisement update
       const actionLog = new ActionLog({
-        user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
         islogin: false,
         rodocref: null,
         ronumber: null,
         old_data: data,
         edited_data: updatedData ?? {},
-        user_role: req.body.user_role || "",
+        user_role: user_role || "",
         action: 6,
         message: `PullBack operation performed by Deputy on advertisement: ${advertisementId} path: /advertisement${req.path}`,
         status: "Success",
-        platform: req.body.platform,
+        platform,
         networkip: clientIp || null,
-        screen: req.body.screen,
+        screen,
         Newspaper_allocation: {
           Newspaper: [],
           allotedtime: null,
@@ -3281,41 +3291,45 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
 
       const ListOfNewsPapperJobAllocationDocRef: DocumentReference[] = [];
       const jobAllocSnap = await getDocs(
-        query(
-          collection(db, "NewspaperJobAllocation"),
-          where("adref", "==", adRef)
-        )
+        query(collection(db, "NewspaperJobAllocation"), where("adref", "==", adRef))
       );
-      jobAllocSnap.forEach((doc) => {
-        ListOfNewsPapperJobAllocationDocRef.push(doc.ref);
+
+      jobAllocSnap.forEach((allocationDoc) => {
+        ListOfNewsPapperJobAllocationDocRef.push(allocationDoc.ref);
       });
-      const notifications: UserNotification[] = [];
-      const notificationApproved: VendorNotification[] = [];
-      const newsPaperList: string[] = [];
-      for (const docRef of ListOfNewsPapperJobAllocationDocRef) {
-        const oldSnap = await getDoc(docRef);
+
+      // store email + roNumber as object
+      const vendorMailList: { to: string; roNumber: number | string }[] = [];
+
+      for (const allocationRef of ListOfNewsPapperJobAllocationDocRef) {
+        const oldSnap = await getDoc(allocationRef);
         const old_data = oldSnap.data();
-        await updateDoc(docRef, {
+
+        await updateDoc(allocationRef, {
           aprovedcw: false,
           completed: false,
         });
-        const newSnap = await getDoc(docRef);
+
+        const newSnap = await getDoc(allocationRef);
         const new_data = newSnap.data();
-        // create action Log
-        const actionLog = new ActionLog({
-          user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+
+        // create action log for allocation update
+        const allocationActionLog = new ActionLog({
+          user_ref: user_ref ? doc(db, "Users", user_ref) : null,
           islogin: false,
-          rodocref: docRef.id ? doc(db, "NewspaperJobAllocation", docRef.id) : null,
-          ronumber: null,
+          rodocref: allocationRef.id
+            ? doc(db, "NewspaperJobAllocation", allocationRef.id)
+            : null,
+          ronumber: old_data?.ronumber || null,
           old_data: old_data ?? {},
           edited_data: new_data ?? {},
-          user_role: req.body.user_role || "",
+          user_role: user_role || "",
           action: 8,
-          message: `PullBack operation performed by Deputy on advertisement: ${advertisementId} and NewspaperJobAllocation: ${docRef.id} path: /advertisement${req.path}`,
+          message: `PullBack operation performed by Deputy on advertisement: ${advertisementId} and NewspaperJobAllocation: ${allocationRef.id} path: /advertisement${req.path}`,
           status: "Success",
-          platform: req.body.platform,
+          platform,
           networkip: clientIp || null,
-          screen: req.body.screen,
+          screen,
           Newspaper_allocation: {
             Newspaper: [],
             allotedtime: null,
@@ -3325,24 +3339,231 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
           actiontime: moment().tz("Asia/Kolkata").toDate(),
           adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
         });
-        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        await addDoc(collection(db, "actionLogs"), { ...allocationActionLog });
 
+        // read vendor email from newspaperrefuserref -> Users doc -> email
+        const newspaperUserRef = old_data?.newspaperrefuserref;
+
+        if (newspaperUserRef) {
+          try {
+            const vendorUserSnap = await getDoc(newspaperUserRef);
+
+            if (vendorUserSnap.exists()) {
+              const vendorUserData = vendorUserSnap.data() as { email?: string };
+              const vendorEmail = vendorUserData?.email;
+              const roNumber = old_data?.ronumber;
+
+              if (vendorEmail && roNumber !== undefined && roNumber !== null) {
+                vendorMailList.push({
+                  to: vendorEmail,
+                  roNumber: roNumber,
+                });
+              }
+            }
+          } catch (err) {
+            console.error(
+              `Failed to read vendor user for allocation ${allocationRef.id}:`,
+              err
+            );
+          }
+        }
       }
-      //create action logs
+
+      // deduplicate same email + roNumber
+      const uniqueVendorMailList = Array.from(
+        new Map(
+          vendorMailList.map((item) => [`${item.to}_${item.roNumber}`, item])
+        ).values()
+      );
+      //cc Mail 
+      const ccMail= data.Bearingno;
+
+      // send pullback mail to each vendor
+      for (const vendor of uniqueVendorMailList) {
+        try {
+          const response = await fetch(
+            `${process.env.NODEMAILER_BASE_URL}/email/pullback`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                roNumber: vendor.roNumber,
+                to: vendor.to,
+                cc:ccMail
+              }),
+            }
+          );
+
+          if (response.status === 200) {
+            const mailSuccessLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: null,
+            
+              old_data: {},
+              edited_data: {
+                
+              },
+              user_role: user_role || "",
+              action: 4,
+              message: `PullBack mail sent successfully to vendor ${vendor.to} for roNumber ${vendor.roNumber} path: /advertisement${req.path}`,
+              status: "Success",
+              platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
+              adRef: adRef,
+            });
+
+            await addDoc(collection(db, "actionLogs"), { ...mailSuccessLog });
+          } else {
+            const mailFailedLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: null,
+              old_data: {},
+              edited_data: {
+
+              },
+              user_role: user_role || "",
+              action: 4,
+              message: `PullBack mail failed to send to vendor ${vendor.to} for roNumber ${vendor.roNumber} path: /advertisement${req.path}`,
+              status: "Failed",
+              platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
+              adRef: adRef,
+            });
+
+            await addDoc(collection(db, "actionLogs"), { ...mailFailedLog });
+
+            try {
+              await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: process.env.FAILED_LOG_TO_MAIL,
+                  cc: process.env.FAILED_LOG_CC_MAIL,
+                  actionName: " PullBack mail failed to send to vendor",
+                  actionEndpoint: `/advertisement${req.path}`,
+                  ErrorInfo: {
+                    message: `PullBack mail failed to send to vendor ${vendor.to} for roNumber ${vendor.roNumber}`,
+                    error: null,
+                  },
+                  userInfo: {
+                    uesrId: user_ref,
+                    role: user_role,
+                    platform,
+                    screen,
+                  },
+                  OtherInfo: {
+                    adRef: advertisementId
+                      ? doc(db, "Advertisement", advertisementId)
+                      : null,
+                    vendor,
+                  },
+                }),
+              });
+            } catch (e) {
+              console.error(
+                `Failed to send fail-log email to ${process.env.FAILED_LOG_TO_MAIL}:`,
+                e
+              );
+            }
+          }
+        } catch (mailError: any) {
+          const mailCatchLog = new ActionLog({
+            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+            islogin: false,
+            rodocref: null,
+            
+            old_data: {},
+            edited_data: {
+            },
+            user_role: user_role || "",
+            action: 4,
+            message: `Error while sending pullback mail to vendor ${vendor.to} for roNumber ${vendor.roNumber}: ${mailError.message} path: /advertisement${req.path}`,
+            status: "Failed",
+            platform,
+            networkip: clientIp || null,
+            screen,
+            Newspaper_allocation: {
+              Newspaper: [],
+              allotedtime: null,
+              allocation_type: null,
+              allotedby: null,
+            },
+            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            adRef: adRef,
+          });
+
+          await addDoc(collection(db, "actionLogs"), { ...mailCatchLog });
+
+          try {
+            await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: process.env.FAILED_LOG_TO_MAIL,
+                cc: process.env.FAILED_LOG_CC_MAIL,
+                actionName: " Error while sending pullback mail to vendor",
+                actionEndpoint: `/advertisement${req.path}`,
+                ErrorInfo: {
+                  message: mailError.message,
+                  error: mailError,
+                },
+                userInfo: {
+                  uesrId: user_ref,
+                  role: user_role,
+                  platform,
+                  screen,
+                },
+                OtherInfo: {
+                  adRef: advertisementId
+                    ? doc(db, "Advertisement", advertisementId)
+                    : null,
+                  vendor,
+                },
+              }),
+            });
+          } catch (e) {
+            console.error(
+              `Failed to send fail-log email to ${process.env.FAILED_LOG_TO_MAIL}:`,
+              e
+            );
+          }
+        }
+      }
+
       const actionLogSuccess = new ActionLog({
-        user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
         islogin: false,
         rodocref: null,
         ronumber: null,
         old_data: {},
-        edited_data: {},
-        user_role: req.body.user_role || "",
+        edited_data: {
+          vendorMailList: uniqueVendorMailList,
+        },
+        user_role: user_role || "",
         action: 202,
-        message: ` PullBack operation performed by Deputy on advertisement is successfully: ${advertisementId} path: /advertisement${req.path}`,
+        message: `PullBack operation performed by Deputy successfully on advertisement: ${advertisementId} path: /advertisement${req.path}`,
         status: "Success",
-        platform: req.body.platform,
+        platform,
         networkip: clientIp || null,
-        screen: req.body.screen,
+        screen,
         Newspaper_allocation: {
           Newspaper: [],
           allotedtime: null,
@@ -3353,28 +3574,28 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
         adRef: adRef,
       });
       await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
+
       res.status(200).json({
         success: true,
         message: "PullBack operation performed successfully",
-        data: updatedData
-
+        data: updatedData,
+        vendorMailList: uniqueVendorMailList,
       });
     } catch (error: Error | any) {
-
       const actionLog = new ActionLog({
-        user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
+        user_ref: user_ref ? doc(db, "Users", user_ref) : null,
         islogin: false,
         rodocref: null,
         ronumber: null,
         old_data: {},
         edited_data: {},
-        user_role: req.body.user_role || "",
+        user_role: user_role || "",
         action: 202,
-        message: `Error while performing PullBack operation performed by Deputy on advertisement: ${error.message} path: /advertisement${req.path}`,
+        message: `Error while performing PullBack operation by Deputy on advertisement: ${error.message} path: /advertisement${req.path}`,
         status: "Failed",
-        platform: req.body.platform,
+        platform,
         networkip: clientIp || null,
-        screen: req.body.screen,
+        screen,
         Newspaper_allocation: {
           Newspaper: [],
           allotedtime: null,
@@ -3384,65 +3605,79 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
         actiontime: moment().tz("Asia/Kolkata").toDate(),
         adRef: adRef,
       });
+
       await addDoc(collection(db, "actionLogs"), { ...actionLog });
-      console.error("❌ Error approving advertisement:", error);
+      console.error("❌ Error performing pullback advertisement:", error);
+
       try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+        await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             to: process.env.FAILED_LOG_TO_MAIL,
             cc: process.env.FAILED_LOG_CC_MAIL,
-            actionName: " Error while performing PullBack operation performed by Deputy",
+            actionName: " Error while performing PullBack operation by Deputy",
             actionEndpoint: `/advertisement${req.path}`,
             ErrorInfo: {
               message: error.message,
-              error: error
+              error: error,
             },
             userInfo: {
-              uesrId: req.body.user_ref,
-              role: req.body.user_role,
-              platform: req.body.platform,
-              screen: req.body.screen
+              uesrId: user_ref,
+              role: user_role,
+              platform,
+              screen,
             },
             OtherInfo: {
-              adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
-            }
+              adRef: advertisementId
+                ? doc(db, "Advertisement", advertisementId)
+                : null,
+            },
           }),
         });
       } catch (e) {
-        console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+        console.error(
+          `Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`,
+          e
+        );
       }
+
       res.status(500).json({ success: false, message: error.message });
     }
   } catch (e: Error | any) {
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: process.env.FAILED_LOG_TO_MAIL,
           cc: process.env.FAILED_LOG_CC_MAIL,
-          actionName: " Error while performing PullBack operation performed by Deputy",
+          actionName: " Error while performing PullBack operation by Deputy",
           actionEndpoint: `/advertisement${req.path}`,
           ErrorInfo: {
             message: e.message,
-            error: e
+            error: e,
           },
           userInfo: {
             uesrId: req.body.user_ref,
             role: req.body.user_role,
             platform: req.body.platform,
-            screen: req.body.screen
+            screen: req.body.screen,
           },
           OtherInfo: {
-            adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
-          }
+            adRef: advertisementId
+              ? doc(db, "Advertisement", advertisementId)
+              : null,
+          },
         }),
       });
-    } catch (e) {
-      console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+    } catch (err) {
+      console.error(
+        `Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`,
+        err
+      );
     }
+
     res.status(500).json({ success: false, message: e.message });
   }
 };
