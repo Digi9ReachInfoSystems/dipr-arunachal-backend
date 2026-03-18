@@ -3375,6 +3375,8 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
           vendorMailList.map((item) => [`${item.to}_${item.roNumber}`, item])
         ).values()
       );
+      //cc Mail 
+      const ccMail= data.Bearingno;
 
       // send pullback mail to each vendor
       for (const vendor of uniqueVendorMailList) {
@@ -3387,6 +3389,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
               body: JSON.stringify({
                 roNumber: vendor.roNumber,
                 to: vendor.to,
+                cc:ccMail
               }),
             }
           );

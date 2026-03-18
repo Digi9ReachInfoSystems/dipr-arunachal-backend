@@ -3161,6 +3161,8 @@ export const deputyPullBackAction = async (req, res) => {
             }
             // deduplicate same email + roNumber
             const uniqueVendorMailList = Array.from(new Map(vendorMailList.map((item) => [`${item.to}_${item.roNumber}`, item])).values());
+            //cc Mail 
+            const ccMail = data.Bearingno;
             // send pullback mail to each vendor
             for (const vendor of uniqueVendorMailList) {
                 try {
@@ -3170,6 +3172,7 @@ export const deputyPullBackAction = async (req, res) => {
                         body: JSON.stringify({
                             roNumber: vendor.roNumber,
                             to: vendor.to,
+                            cc: ccMail
                         }),
                     });
                     if (response.status === 200) {
