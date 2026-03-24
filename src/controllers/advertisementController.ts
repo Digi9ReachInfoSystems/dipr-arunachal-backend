@@ -1637,7 +1637,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
     // Early check
     if (
       Array.isArray(advertisementData?.caseworkerdraftnewspapers) &&
-      advertisementData.caseworkerdraftnewspapers.length > 1
+      advertisementData.caseworkerdraftnewspapers.length > 0
     ) {
       return res.status(200).json({
         success: true,

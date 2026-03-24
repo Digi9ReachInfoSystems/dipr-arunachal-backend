@@ -1529,7 +1529,7 @@ export const automaticAllocationSendToDeputy = async (req, res) => {
         const advertisementData = advertisementSnap.data();
         // Early check
         if (Array.isArray(advertisementData?.caseworkerdraftnewspapers) &&
-            advertisementData.caseworkerdraftnewspapers.length > 1) {
+            advertisementData.caseworkerdraftnewspapers.length > 0) {
             return res.status(200).json({
                 success: true,
                 message: "caseworkerdraftnewspapers length is more than 1.",
