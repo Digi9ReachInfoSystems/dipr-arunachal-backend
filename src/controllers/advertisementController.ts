@@ -1639,7 +1639,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
       Array.isArray(advertisementData?.caseworkerdraftnewspapers) &&
       advertisementData.caseworkerdraftnewspapers.length > 0
     ) {
-      console.log("existing caseworkerdraftnewspapers length is more than 1.");
+      console.log("existing caseworkerdraftnewspapers length is more than 0.");
       //update the advertisement docuement
       const result = await updateDoc(advertisementRef, {
         Status_Deputy: 0,
@@ -1657,7 +1657,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
         message: "caseworkerdraftnewspapers length is more than 1.",
       });
     }
-    console.log("existing caseworkerdraftnewspapers length is 0.", (Array.isArray(advertisementData?.caseworkerdraftnewspapers)),);
+   
 
 
     let logStatus = "success";
@@ -2059,6 +2059,49 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
 export const manualAllocationSendToDeputy = async (req: Request, res: Response) => {
   const { advertisementId, user_ref, user_role, platform, screen, allotedNewspapers } = req.body;
   try {
+      if (!advertisementId) {
+      return res.status(400).json({
+        success: false,
+        message: "advertisementId is required.",
+      });
+    }
+
+    // Get advertisement document
+    const advertisementRef = doc(db, "Advertisement", advertisementId);
+    const advertisementSnap = await getDoc(advertisementRef);
+
+    if (!advertisementSnap.exists()) {
+      return res.status(404).json({
+        success: false,
+        message: "Advertisement not found.",
+      });
+    }
+
+    const advertisementData = advertisementSnap.data();
+
+    // Early check
+    if (
+      Array.isArray(advertisementData?.caseworkerdraftnewspapers) &&
+      advertisementData.caseworkerdraftnewspapers.length > 0
+    ) {
+      console.log("existing caseworkerdraftnewspapers length is more than 0.");
+      //update the advertisement docuement
+      const result = await updateDoc(advertisementRef, {
+        Status_Deputy: 0,
+          Status_Vendor: 1,
+          Status_Caseworker: 5,
+          approved: true,
+          Is_CaseWorker: true,
+          isDarft: false,
+          approvedstatus: 0,
+          IsrequesPending: true,
+          manuallyallotted: true,
+      })
+      return res.status(200).json({
+        success: true,
+        message: "caseworkerdraftnewspapers length is more than 1.",
+      });
+    }
 
 
     let logStatus = "success";
