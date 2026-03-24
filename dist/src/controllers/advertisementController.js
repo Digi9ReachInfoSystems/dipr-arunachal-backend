@@ -1780,7 +1780,7 @@ export const automaticAllocationSendToDeputy = async (req, res) => {
                         allocation_type: AllocationType.AUTOMATIC,
                         allotedby: user_ref ? doc(db, "Users", user_ref) : null,
                     },
-                    adRef: allocRef,
+                    adRef: adRef,
                     actiontime: moment().tz("Asia/Kolkata").toDate(),
                 });
                 const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
