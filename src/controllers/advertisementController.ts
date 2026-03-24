@@ -1614,6 +1614,52 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
   try {
 
 
+    if (!advertisementId) {
+      return res.status(400).json({
+        success: false,
+        message: "advertisementId is required.",
+      });
+    }
+
+    // Get advertisement document
+    const advertisementRef = doc(db, "Advertisement", advertisementId);
+    const advertisementSnap = await getDoc(advertisementRef);
+
+    if (!advertisementSnap.exists()) {
+      return res.status(404).json({
+        success: false,
+        message: "Advertisement not found.",
+      });
+    }
+
+    const advertisementData = advertisementSnap.data();
+
+    // Early check
+    if (
+      Array.isArray(advertisementData?.caseworkerdraftnewspapers) &&
+      advertisementData.caseworkerdraftnewspapers.length > 0
+    ) {
+      console.log("existing caseworkerdraftnewspapers length is more than 0.");
+      //update the advertisement docuement
+      const result = await updateDoc(advertisementRef, {
+        Status_Deputy: 0,
+        Status_Vendor: 1,
+        Status_Caseworker: 5,
+        approved: true,
+        Is_CaseWorker: true,
+        isDarft: false,
+        approvedstatus: 0,
+        IsrequesPending: true,
+        manuallyallotted: false,
+      })
+      return res.status(200).json({
+        success: true,
+        message: "caseworkerdraftnewspapers length is more than 1.",
+      });
+    }
+   
+
+
     let logStatus = "success";
     let logMessage = "Automatic allocation completed successfully.";
     let oldData: any = {};
@@ -1778,11 +1824,11 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
           body: JSON.stringify({
             to,
             // to: "jayanthbr@digi9.co.in",
-            roNumber:advertisementNumber,
+            roNumber: advertisementNumber,
             // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
             cc: process.env.CC_MAIL,
             listOfNewspapers: newsPaperList,
-            addressTo:"Technical Assistant",
+            addressTo: "Technical Assistant",
           }),
         });
         if (response.status == 200) {
@@ -2013,6 +2059,49 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
 export const manualAllocationSendToDeputy = async (req: Request, res: Response) => {
   const { advertisementId, user_ref, user_role, platform, screen, allotedNewspapers } = req.body;
   try {
+      if (!advertisementId) {
+      return res.status(400).json({
+        success: false,
+        message: "advertisementId is required.",
+      });
+    }
+
+    // Get advertisement document
+    const advertisementRef = doc(db, "Advertisement", advertisementId);
+    const advertisementSnap = await getDoc(advertisementRef);
+
+    if (!advertisementSnap.exists()) {
+      return res.status(404).json({
+        success: false,
+        message: "Advertisement not found.",
+      });
+    }
+
+    const advertisementData = advertisementSnap.data();
+
+    // Early check
+    if (
+      Array.isArray(advertisementData?.caseworkerdraftnewspapers) &&
+      advertisementData.caseworkerdraftnewspapers.length > 0
+    ) {
+      console.log("existing caseworkerdraftnewspapers length is more than 0.");
+      //update the advertisement docuement
+      const result = await updateDoc(advertisementRef, {
+        Status_Deputy: 0,
+          Status_Vendor: 1,
+          Status_Caseworker: 5,
+          approved: true,
+          Is_CaseWorker: true,
+          isDarft: false,
+          approvedstatus: 0,
+          IsrequesPending: true,
+          manuallyallotted: true,
+      })
+      return res.status(200).json({
+        success: true,
+        message: "caseworkerdraftnewspapers length is more than 1.",
+      });
+    }
 
 
     let logStatus = "success";
@@ -3376,7 +3465,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
         ).values()
       );
       //cc Mail 
-      const ccMail= data.Bearingno;
+      const ccMail = data.Bearingno;
 
       // send pullback mail to each vendor
       for (const vendor of uniqueVendorMailList) {
@@ -3389,7 +3478,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
               body: JSON.stringify({
                 roNumber: vendor.roNumber,
                 to: vendor.to,
-                cc:ccMail
+                cc: ccMail
               }),
             }
           );
@@ -3399,10 +3488,10 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
               user_ref: user_ref ? doc(db, "Users", user_ref) : null,
               islogin: false,
               rodocref: null,
-            
+
               old_data: {},
               edited_data: {
-                
+
               },
               user_role: user_role || "",
               action: 4,
@@ -3489,7 +3578,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
             user_ref: user_ref ? doc(db, "Users", user_ref) : null,
             islogin: false,
             rodocref: null,
-            
+
             old_data: {},
             edited_data: {
             },
