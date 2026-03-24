@@ -1531,6 +1531,18 @@ export const automaticAllocationSendToDeputy = async (req, res) => {
         if (Array.isArray(advertisementData?.caseworkerdraftnewspapers) &&
             advertisementData.caseworkerdraftnewspapers.length > 0) {
             console.log("existing caseworkerdraftnewspapers length is more than 1.");
+            //update the advertisement docuement
+            const result = await updateDoc(advertisementRef, {
+                Status_Deputy: 0,
+                Status_Vendor: 1,
+                Status_Caseworker: 5,
+                approved: true,
+                Is_CaseWorker: true,
+                isDarft: false,
+                approvedstatus: 0,
+                IsrequesPending: true,
+                manuallyallotted: false,
+            });
             return res.status(200).json({
                 success: true,
                 message: "caseworkerdraftnewspapers length is more than 1.",
