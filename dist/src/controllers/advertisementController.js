@@ -1511,6 +1511,30 @@ export const manualAllocationSendToNewspaper = async (req, res) => {
 export const automaticAllocationSendToDeputy = async (req, res) => {
     const { advertisementId, user_ref, user_role, platform, screen, numOfVendors } = req.body;
     try {
+        if (!advertisementId) {
+            return res.status(400).json({
+                success: false,
+                message: "advertisementId is required.",
+            });
+        }
+        // Get advertisement document
+        const advertisementRef = doc(db, "Advertisements", advertisementId);
+        const advertisementSnap = await getDoc(advertisementRef);
+        if (!advertisementSnap.exists()) {
+            return res.status(404).json({
+                success: false,
+                message: "Advertisement not found.",
+            });
+        }
+        const advertisementData = advertisementSnap.data();
+        // Early check
+        if (Array.isArray(advertisementData?.caseworkerdraftnewspapers) &&
+            advertisementData.caseworkerdraftnewspapers.length > 1) {
+            return res.status(200).json({
+                success: true,
+                message: "caseworkerdraftnewspapers length is more than 1.",
+            });
+        }
         let logStatus = "success";
         let logMessage = "Automatic allocation completed successfully.";
         let oldData = {};
