@@ -1639,11 +1639,13 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
       Array.isArray(advertisementData?.caseworkerdraftnewspapers) &&
       advertisementData.caseworkerdraftnewspapers.length > 0
     ) {
+      console.log("existing caseworkerdraftnewspapers length is more than 1.");
       return res.status(200).json({
         success: true,
         message: "caseworkerdraftnewspapers length is more than 1.",
       });
     }
+    console.log("existing caseworkerdraftnewspapers length is 0.",(Array.isArray(advertisementData?.caseworkerdraftnewspapers)),);
 
 
     let logStatus = "success";
