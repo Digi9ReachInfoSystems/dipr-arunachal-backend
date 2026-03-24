@@ -1518,7 +1518,7 @@ export const automaticAllocationSendToDeputy = async (req, res) => {
             });
         }
         // Get advertisement document
-        const advertisementRef = doc(db, "Advertisements", advertisementId);
+        const advertisementRef = doc(db, "Advertisement", advertisementId);
         const advertisementSnap = await getDoc(advertisementRef);
         if (!advertisementSnap.exists()) {
             return res.status(404).json({
