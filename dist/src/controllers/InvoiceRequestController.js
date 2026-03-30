@@ -2161,21 +2161,29 @@ export const assistantApproveInvoiceRequest = async (req, res) => {
             }
             let approvedlist = [];
             if (userData && typeof userData === "object" && "approvedlist" in userData) {
-                approvedlist = userData.approvedlist;
+                approvedlist = userData.approvedlist || [];
             }
-            approvedlist.push({
-                adref: invoiceData.advertiseRef,
-                id: invoiceData.Ronumber,
-                date: invoiceData.DateOfInvoice,
-                departmenttype: invoiceData.TypeOfDepartment,
-                description: invoiceData.billno,
-                invoiceref: invoiceRef,
-                amount: invoiceData.invoiceamount,
-                userrerf: invoiceData.Userref,
-                billno: invoiceData.billno,
-                billingaddress: invoiceData.billingAddress,
-                deptName: invoiceData.DeptName
-            });
+            const roNumber = invoiceData.Ronumber;
+            // 🔍 Check if RO number already exists
+            const alreadyExists = approvedlist.some((item) => item.id === roNumber);
+            if (alreadyExists) {
+                console.log(`RO Number ${roNumber} already exists in approved list`);
+            }
+            else {
+                approvedlist.push({
+                    adref: invoiceData.advertiseRef,
+                    id: roNumber,
+                    date: invoiceData.DateOfInvoice,
+                    departmenttype: invoiceData.TypeOfDepartment,
+                    description: invoiceData.billno,
+                    invoiceref: invoiceRef,
+                    amount: invoiceData.invoiceamount,
+                    userrerf: invoiceData.Userref,
+                    billno: invoiceData.billno,
+                    billingaddress: invoiceData.billingAddress,
+                    deptName: invoiceData.DeptName
+                });
+            }
             // update user collection
             await updateDoc(userRef, {
                 approvedlist: approvedlist,

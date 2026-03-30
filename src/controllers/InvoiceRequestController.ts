@@ -2297,24 +2297,34 @@ export const assistantApproveInvoiceRequest = async (req: Request, res: Response
                     message: "User not found",
                 });
             }
-            let approvedlist = [];
-            if (userData && typeof userData === "object" && "approvedlist" in userData) {
-                approvedlist = (userData as any).approvedlist;
-            }
-            approvedlist.push({
-                adref: invoiceData.advertiseRef,
-                id: invoiceData.Ronumber,
-                date: invoiceData.DateOfInvoice,
-                departmenttype: invoiceData.TypeOfDepartment,
-                description: invoiceData.billno,
-                invoiceref: invoiceRef,
-                amount: invoiceData.invoiceamount,
-                userrerf: invoiceData.Userref,
-                billno: invoiceData.billno,
-                billingaddress: invoiceData.billingAddress,
-                deptName: invoiceData.DeptName
+            let approvedlist: any[] = [];
 
-            });
+            if (userData && typeof userData === "object" && "approvedlist" in userData) {
+                approvedlist = (userData as any).approvedlist || [];
+            }
+
+            const roNumber = invoiceData.Ronumber;
+
+            // 🔍 Check if RO number already exists
+            const alreadyExists = approvedlist.some((item: any) => item.id === roNumber);
+
+            if (alreadyExists) {
+                console.log(`RO Number ${roNumber} already exists in approved list`);
+            } else {
+                approvedlist.push({
+                    adref: invoiceData.advertiseRef,
+                    id: roNumber,
+                    date: invoiceData.DateOfInvoice,
+                    departmenttype: invoiceData.TypeOfDepartment,
+                    description: invoiceData.billno,
+                    invoiceref: invoiceRef,
+                    amount: invoiceData.invoiceamount,
+                    userrerf: invoiceData.Userref,
+                    billno: invoiceData.billno,
+                    billingaddress: invoiceData.billingAddress,
+                    deptName: invoiceData.DeptName
+                });
+            }
             // update user collection
             await updateDoc(userRef, {
                 approvedlist: approvedlist,
@@ -6751,7 +6761,7 @@ export const deputyInvoiceReject = async (req: Request, res: Response) => {
             await updateDoc(invoiceRef, {
                 deputydirecotor: feedback,
                 deputyDirector_status: 3,
-                isRead:false,
+                isRead: false,
                 // DateOfInvoice: serverTimestamp(),
                 // sendAgain: true,
             });
