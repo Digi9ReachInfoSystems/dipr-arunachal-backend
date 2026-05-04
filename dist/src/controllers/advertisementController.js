@@ -1168,9 +1168,10 @@ export const manualAllocationSendToNewspaper = async (req, res) => {
                         return ref;
                     }),
                 ];
+                // commented the queue updation logic below 4-04-2026
                 transaction.update(joblogicRef, {
                     ronumbers: increment(numOfVendors),
-                    waitingquuelist: updatedQueue,
+                    // waitingquuelist: updatedQueue,
                     updatedAt: serverTimestamp(),
                 });
                 return { allotednewspapers, ronumbers, numOfVendors, successAllocations };
@@ -2102,9 +2103,10 @@ export const manualAllocationSendToDeputy = async (req, res) => {
                         return ref;
                     }),
                 ];
+                // commented the queue updation logic below 4-04-2026
                 transaction.update(joblogicRef, {
                     ronumbers: increment(numOfVendors),
-                    waitingquuelist: updatedQueue,
+                    // waitingquuelist: updatedQueue,
                     updatedAt: serverTimestamp(),
                 });
                 return { allotednewspapers, ronumbers, numOfVendors, successAllocations };
