@@ -56,25 +56,25 @@ export const createActionLog = async (req: Request, res: Response) => {
     if (body.user_ref) {
       const collectionData = body.user_ref.split("/");
       body.user_ref =
-        collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
+        collectionData.length > 2 && collectionData[1] && collectionData[2] ? doc(db, collectionData[1], collectionData[2]) : null;
     }
 
     if (body.rodocref) {
       const collectionData = body.rodocref.split("/");
       body.rodocref =
-        collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
+        collectionData.length > 2 && collectionData[1] && collectionData[2] ? doc(db, collectionData[1], collectionData[2]) : null;
     }
 
     if (body.docrefinvoice) {
       const collectionData = body.docrefinvoice.split("/");
       body.docrefinvoice =
-        collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
+        collectionData.length > 2 && collectionData[1] && collectionData[2] ? doc(db, collectionData[1], collectionData[2]) : null;
     }
 
     if (body.Newspaper_allocation?.allotedby) {
       const collectionData = body.Newspaper_allocation.allotedby.split("/");
       body.Newspaper_allocation.allotedby =
-        collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
+        collectionData.length > 2 && collectionData[1] && collectionData[2] ? doc(db, collectionData[1], collectionData[2]) : null;
     }
 
     // Convert string → Date
@@ -90,12 +90,12 @@ export const createActionLog = async (req: Request, res: Response) => {
     if (body.adRef) {
       const collectionData = body.adRef.split("/");
       body.adRef =
-        collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
+        collectionData.length > 2 && collectionData[1] && collectionData[2] ? doc(db, collectionData[1], collectionData[2]) : null;
     }
     if (body.note_sheet_allocation) {
       const collectionData = body.note_sheet_allocation.split("/");
       body.note_sheet_allocation =
-        collectionData.length > 2 ? doc(db, collectionData[1], collectionData[2]) : null;
+        collectionData.length > 2 && collectionData[1] && collectionData[2] ? doc(db, collectionData[1], collectionData[2]) : null;
     }
 
     const log = new ActionLog(body);

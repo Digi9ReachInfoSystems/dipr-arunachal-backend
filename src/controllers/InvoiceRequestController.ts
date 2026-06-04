@@ -121,7 +121,7 @@ export const createInvoice = async (req: Request, res: Response) => {
         let userRef: DocumentReference | null = null;
         if (Userref) {
             const collectionData = Userref.split("/");
-            if (collectionData.length > 0) {
+            if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
                 userRef = doc(db, collectionData[1], collectionData[2]);
             }
 
@@ -129,7 +129,7 @@ export const createInvoice = async (req: Request, res: Response) => {
         let adRef: DocumentReference | null = null;
         if (advertiseRef) {
             const collectionData = advertiseRef.split("/");
-            if (collectionData.length > 0) {
+            if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
                 adRef = doc(db, collectionData[1], collectionData[2]);
             }
         }
@@ -137,7 +137,7 @@ export const createInvoice = async (req: Request, res: Response) => {
         let jobRef: DocumentReference | null = null;
         if (jobref) {
             const collectionData = jobref.split("/");
-            if (collectionData.length > 0) {
+            if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
                 jobRef = doc(db, collectionData[1], collectionData[2]);
             }
         }
@@ -569,14 +569,14 @@ export const editInvoice = async (req: Request, res: Response) => {
                 updateData.TypeOfDepartment = TypeOfDepartment;
             if (Userref !== undefined) {
                 const collectionData = Userref.split("/");
-                if (collectionData.length > 1) {
+                if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
                     updateData.Userref = doc(db, collectionData[1], collectionData[2]);
                 }
                 // updateData.Userref = doc(db, `Users/${Userref}`);
             }
             if (advertiseRef !== undefined) {
                 const collectionData = advertiseRef.split("/");
-                if (collectionData.length > 1) {
+                if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
                     updateData.advertiseRef = doc(db, collectionData[1], collectionData[2]);
                 }
                 // updateData.advertiseRef = doc(db, `Advertisement/${advertiseRef}`);
@@ -591,7 +591,7 @@ export const editInvoice = async (req: Request, res: Response) => {
 
             if (jobref !== undefined) {
                 const collectionData = jobref.split("/");
-                if (collectionData.length > 1) {
+                if (collectionData.length > 2 && collectionData[1] && collectionData[2]) {
                     updateData.jobref = doc(db, collectionData[1], collectionData[2]);
                 }
             }

@@ -599,6 +599,9 @@ export const createNoteSheet = async (req: Request, res: Response) => {
 export const uploadSanctionletter = async (req: Request, res: Response) => {
     const { approvedAdId, sanctionLettter, user_id, user_role, platform, screen } = req.body;
     try {
+        if (!user_id || !approvedAdId) {
+            return res.status(400).json({ success: false, message: "user_id and approvedAdId are required" });
+        }
 
 
         const xForwardedFor = req.headers["x-forwarded-for"];
@@ -869,6 +872,7 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
             });
         }
     } catch (e: Error | any) {
+        console.error("uploadSanctionletter fatal:", e?.stack || e);
         try {
             const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
                 method: "POST",
@@ -895,6 +899,9 @@ export const uploadSanctionletter = async (req: Request, res: Response) => {
             });
         } catch (e) {
             console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+        }
+        if (!res.headersSent) {
+            return res.status(500).json({ success: false, message: e.message });
         }
     }
 };
