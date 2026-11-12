@@ -18,6 +18,8 @@ import {
 } from "firebase/firestore";
 import moment from "moment-timezone";
 import db from "../configs/firebase.js";
+import { countDocs } from "../utils/countDocs.js";
+import { addActionLog, backgroundFetch, runInBackground } from "../utils/background.js";
 import Advertisement, { type AdvertisementProps } from "../models/advertisementModel.js";
 import ActionLog, { AllocationType, PlatformType } from "../models/actionLogModel.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -135,7 +137,7 @@ export const createAdvertisement = async (req: Request, res: Response) => {
       actiontime: moment().tz("Asia/Kolkata").toDate(),
       adRef: docRef.id ? doc(db, "Advertisement", docRef.id) : null,
     });
-    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+    const actionLogRef = await addActionLog({ ...actionLog });
     // create action log
     const actionLogAdd = new ActionLog({
       user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
@@ -160,7 +162,7 @@ export const createAdvertisement = async (req: Request, res: Response) => {
       actiontime: moment().tz("Asia/Kolkata").toDate(),
       adRef: docRef.id ? doc(db, "Advertisement", docRef.id) : null,
     });
-    const actionLogRefADD = await addDoc(collection(db, "actionLogs"), { ...actionLogAdd });
+    const actionLogRefADD = await addActionLog({ ...actionLogAdd });
     return res.status(201).json({
       success: true,
       id: docRef.id,
@@ -195,9 +197,9 @@ export const createAdvertisement = async (req: Request, res: Response) => {
       actiontime: moment().tz("Asia/Kolkata").toDate(),
       adRef: null,
     });
-    await addDoc(collection(db, "actionLogs"), { ...actionLog });
+    await addActionLog({ ...actionLog });
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -379,7 +381,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       actiontime: moment().tz("Asia/Kolkata").toDate(),
       adRef: docRef.id ? doc(db, "Advertisement", docRef.id) : null,
     });
-    await addDoc(collection(db, "actionLogs"), { ...actionLog });
+    await addActionLog({ ...actionLog });
 
     return res.status(200).json({
       success: true,
@@ -414,10 +416,10 @@ export const editAdvertisement = async (req: Request, res: Response) => {
       actiontime: moment().tz("Asia/Kolkata").toDate(),
       adRef: id ? doc(db, "Advertisement", id) : null,
     });
-    await addDoc(collection(db, "actionLogs"), { ...actionLog })
+    await addActionLog({ ...actionLog })
 
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -580,7 +582,7 @@ export const editAdvertisement = async (req: Request, res: Response) => {
 //       const allocationDocRef = await addDoc(collection(db, "NewspaperJobAllocation"), allocationPayload);
 //       joballocationData.push({ id: allocationDocRef.id, ...allocationPayload });
 //       console.log(`📰 Created allocation for vendor ${i + 1}`);
-//       const userSnap = await getDoc(vendorDocRef);
+//       const userSnap = (await vendorSnaps[i])!;
 //       if (userSnap.exists()) {
 //         const userData = userSnap.data();
 //         if (userData) {
@@ -713,6 +715,9 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
     const newsPaperList: string[] = [];
     try {
       // 🔹 Transaction
+      // Vendor user docs are read in parallel up front instead of one by one inside the transaction
+      const vendorSnaps = allotednewspapers.map((r: any) => (r ? getDoc(r as DocumentReference<DocumentData>) : null));
+      vendorSnaps.forEach((p) => p?.catch(() => {})); // errors still surface where awaited below
       const result = await runTransaction(db, async (transaction) => {
         // 1. Update Advertisement
         const updateResult = await transaction.update(adRef, {
@@ -755,7 +760,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
           transaction.set(allocationRef, allocationPayload);
           // console.log(`📰 Created allocation for vendor ${vendorDocRef}`);
           if (!vendorDocRef) continue;
-          const userSnap = await getDoc(vendorDocRef);
+          const userSnap = (await vendorSnaps[i])!;
           if (userSnap.exists()) {
             const userData = userSnap.data();
             if (userData) {
@@ -788,25 +793,129 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
       console.log("✅ Transaction committed successfully");
 
       //mail logic to vendors
-      for (const mail of vendorMailList) {
+      runInBackground(async () => {
+        await Promise.all(vendorMailList.map(async (mail: any) => {
+          try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(mail),
+            });
+            if (response.status == 200) {
+              //create action log for mail sent
+              const actionLog = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: mail.allocationRef, // each allocation doc ref
+                ronumber: mail.roNumber,
+                old_data: {},
+                edited_data: {},
+                user_role,
+                action: 4,
+                message: `Automatic Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${mail.to} path: /advertisement${req.path}`,
+                status: "Success",
+                platform: platform,
+                networkip: clientIp || null,
+                screen,
+                Newspaper_allocation: {
+                  Newspaper: [],
+                  allotedtime: null,
+                  allocation_type: null,
+                  allotedby: null,
+                },
+                adRef: adRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+              });
+              const actionLogRef = await addActionLog({ ...actionLog });
+            } else {
+              const actionLog = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: mail.allocationRef, // each allocation doc ref
+                ronumber: mail.roNumber,
+                old_data: {},
+                edited_data: {},
+                user_role,
+                action: 4,
+                message: `Automatic Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path}`,
+                status: "Failed",
+                platform: platform,
+                networkip: clientIp || null,
+                screen,
+                Newspaper_allocation: {
+                  Newspaper: [],
+                  allotedtime: null,
+                  allocation_type: null,
+                  allotedby: null,
+                },
+                adRef: adRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+              });
+              const actionLogRef = await addActionLog({ ...actionLog });
+              try {
+                const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    to: process.env.FAILED_LOG_TO_MAIL,
+                    cc: process.env.FAILED_LOG_CC_MAIL,
+                    actionName: " Automatic allocation sent  to newspaper mail sent to department:",
+                    actionEndpoint: `/advertisement${req.path}`,
+                    ErrorInfo: {
+                      message: `Automatic Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path}`,
+                      error: null
+                    },
+                    userInfo: {
+                      uesrId: req.body.user_ref,
+                      role: req.body.user_role,
+                      platform: req.body.platform,
+                      screen: req.body.screen
+                    },
+                    OtherInfo: {
+                      adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
+                    }
+                  }),
+                });
+              } catch (e) {
+                console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+              }
+            }
+            console.log(`Email sent to ${mail.to}`, response);
+          } catch (err: any) {
+            console.error(`Failed to send email to ${mail.to}:`, err.message);
+          }
+        }));
+      });
+      // Send mail to department
+      const advertisementNumber = adSnap.data().AdvertisementId || "";
+      const to = adSnap.data().Bearingno || "";
+      runInBackground(async () => {
         try {
-          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+
+          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(mail),
+            body: JSON.stringify({
+              to,
+              // to: "jayanthbr@digi9.co.in",
+              advertisementNumber,
+              // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
+              cc: process.env.CC_MAIL,
+              listOfNewspapers: newsPaperList,
+            }),
           });
           if (response.status == 200) {
             //create action log for mail sent
             const actionLog = new ActionLog({
               user_ref: user_ref ? doc(db, "Users", user_ref) : null,
               islogin: false,
-              rodocref: mail.allocationRef, // each allocation doc ref
-              ronumber: mail.roNumber,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
               old_data: {},
               edited_data: {},
               user_role,
               action: 4,
-              message: `Automatic Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${mail.to} path: /advertisement${req.path}`,
+              message: `Automatic Allocation sent  to newspaper mail sent to department Successfully to mail id ${to} path: /advertisement${req.path}`,
               status: "Success",
               platform: platform,
               networkip: clientIp || null,
@@ -820,18 +929,18 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
               adRef: adRef,
               actiontime: moment().tz("Asia/Kolkata").toDate(),
             });
-            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            const actionLogRef = await addActionLog({ ...actionLog });
           } else {
             const actionLog = new ActionLog({
               user_ref: user_ref ? doc(db, "Users", user_ref) : null,
               islogin: false,
-              rodocref: mail.allocationRef, // each allocation doc ref
-              ronumber: mail.roNumber,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
               old_data: {},
               edited_data: {},
               user_role,
               action: 4,
-              message: `Automatic Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path}`,
+              message: `Automatic Allocation sent  to newspaper mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
               status: "Failed",
               platform: platform,
               networkip: clientIp || null,
@@ -845,9 +954,9 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
               adRef: adRef,
               actiontime: moment().tz("Asia/Kolkata").toDate(),
             });
-            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            const actionLogRef = await addActionLog({ ...actionLog });
             try {
-              const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+              const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -856,7 +965,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
                   actionName: " Automatic allocation sent  to newspaper mail sent to department:",
                   actionEndpoint: `/advertisement${req.path}`,
                   ErrorInfo: {
-                    message: `Automatic Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path}`,
+                    message: `Automatic Allocation sent  to newspaper mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
                     error: null
                   },
                   userInfo: {
@@ -874,111 +983,11 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
               console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
             }
           }
-          console.log(`Email sent to ${mail.to}`, response);
-        } catch (err: any) {
-          console.error(`Failed to send email to ${mail.to}:`, err.message);
+          console.log(`Email sent to department`, to, response);
+        } catch (err: Error | any) {
+          console.error(`Failed to send email to ${to}:`, err.message);
         }
-      }
-      // Send mail to department
-      const advertisementNumber = adSnap.data().AdvertisementId || "";
-      const to = adSnap.data().Bearingno || "";
-      try {
-
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to,
-            // to: "jayanthbr@digi9.co.in",
-            advertisementNumber,
-            // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
-            cc: process.env.CC_MAIL,
-            listOfNewspapers: newsPaperList,
-          }),
-        });
-        if (response.status == 200) {
-          //create action log for mail sent
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Automatic Allocation sent  to newspaper mail sent to department Successfully to mail id ${to} path: /advertisement${req.path}`,
-            status: "Success",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-          });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-        } else {
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Automatic Allocation sent  to newspaper mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
-            status: "Failed",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-          });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-          try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: process.env.FAILED_LOG_TO_MAIL,
-                cc: process.env.FAILED_LOG_CC_MAIL,
-                actionName: " Automatic allocation sent  to newspaper mail sent to department:",
-                actionEndpoint: `/advertisement${req.path}`,
-                ErrorInfo: {
-                  message: `Automatic Allocation sent  to newspaper mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
-                  error: null
-                },
-                userInfo: {
-                  uesrId: req.body.user_ref,
-                  role: req.body.user_role,
-                  platform: req.body.platform,
-                  screen: req.body.screen
-                },
-                OtherInfo: {
-                  adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
-                }
-              }),
-            });
-          } catch (e) {
-            console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
-          }
-        }
-        console.log(`Email sent to department`, to, response);
-      } catch (err: Error | any) {
-        console.error(`Failed to send email to ${to}:`, err.message);
-      }
+      });
 
       editedData = { allotednewspapers: result.allotednewspapers };
       logStatus = "success";
@@ -1011,7 +1020,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
           adRef: allocRef,
           actiontime: moment().tz("Asia/Kolkata").toDate(),
         });
-        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        const actionLogRef = await addActionLog({ ...actionLog });
         actionLogRefs.push(actionLogRef.id);
       }
 
@@ -1053,11 +1062,11 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
           actiontime: moment().tz("Asia/Kolkata").toDate(),
           adRef: adRef,
         });
-        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        await addActionLog({ ...actionLog });
       }
 
       try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+        const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1089,7 +1098,7 @@ export const automaticAllocationSendToNewspaper = async (req: Request, res: Resp
 
   } catch (e: Error | any) {
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1180,6 +1189,9 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
     const newsPaperList: string[] = [];
     try {
       // 🔹 Transaction
+      // Vendor user docs are read in parallel up front instead of one by one inside the transaction
+      const vendorSnaps = allotednewspapers.map((r: any) => (r ? getDoc(r as DocumentReference<DocumentData>) : null));
+      vendorSnaps.forEach((p) => p?.catch(() => {})); // errors still surface where awaited below
       const result = await runTransaction(db, async (transaction) => {
         // 1. Update Advertisement
         const updateResult = await transaction.update(adRef, {
@@ -1222,7 +1234,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
           transaction.set(allocationRef, allocationPayload);
           // console.log(`📰 Created allocation for vendor ${vendorDocRef}`);
           if (!vendorDocRef) continue;
-          const userSnap = await getDoc(vendorDocRef);
+          const userSnap = (await vendorSnaps[i])!;
           if (userSnap.exists()) {
             const userData = userSnap.data();
             if (userData) {
@@ -1279,25 +1291,130 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
       console.log("✅ Transaction committed successfully");
 
       //mail logic to vendors
-      for (const mail of vendorMailList) {
+      runInBackground(async () => {
+        await Promise.all(vendorMailList.map(async (mail: any) => {
+          try {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(mail),
+            });
+            if (response.status == 200) {
+              //create action log for mail sent
+              const actionLog = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: mail.allocationRef, // each allocation doc ref
+                ronumber: mail.roNumber,
+                old_data: {},
+                edited_data: {},
+                user_role,
+                action: 4,
+                message: `Manual Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${mail.to} path: /advertisement${req.path}`,
+                status: "Success",
+                platform: platform,
+                networkip: clientIp || null,
+                screen,
+                Newspaper_allocation: {
+                  Newspaper: [],
+                  allotedtime: null,
+                  allocation_type: null,
+                  allotedby: null,
+                },
+                adRef: adRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+              });
+              const actionLogRef = await addActionLog({ ...actionLog });
+            } else {
+              const actionLog = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: mail.allocationRef, // each allocation doc ref
+                ronumber: mail.roNumber,
+                old_data: {},
+                edited_data: {},
+                user_role,
+                action: 4,
+                message: `Manual Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path}`,
+                status: "Failed",
+                platform: platform,
+                networkip: clientIp || null,
+                screen,
+                Newspaper_allocation: {
+                  Newspaper: [],
+                  allotedtime: null,
+                  allocation_type: null,
+                  allotedby: null,
+                },
+                adRef: adRef,
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+              });
+              const actionLogRef = await addActionLog({ ...actionLog });
+              try {
+                const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    to: process.env.FAILED_LOG_TO_MAIL,
+                    cc: process.env.FAILED_LOG_CC_MAIL,
+                    actionName: " Manual allocation send to newspapers failed:  mail failed ",
+                    actionEndpoint: `/advertisement${req.path}`,
+                    ErrorInfo: {
+                      message: `Manual Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path}`,
+                      error: null
+                    },
+                    userInfo: {
+                      uesrId: req.body.user_ref,
+                      role: req.body.user_role,
+                      platform: req.body.platform,
+                      screen: req.body.screen
+                    },
+                    OtherInfo: {
+                      adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
+                    }
+                  }),
+                });
+              } catch (e) {
+                console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+              }
+            }
+            console.log(`Email sent to ${mail.to}`, response);
+          } catch (err: any) {
+            console.error(`Failed to send email to ${mail.to}:`, err.message);
+          }
+
+        }));
+      });
+      // Send mail to department
+      const advertisementNumber = adSnap.data().AdvertisementId || "";
+      const to = adSnap.data().Bearingno || "";
+      runInBackground(async () => {
         try {
-          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+
+          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(mail),
+            body: JSON.stringify({
+              to,
+              // to: "jayanthbr@digi9.co.in",
+              advertisementNumber,
+              // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
+              cc: process.env.CC_MAIL,
+              listOfNewspapers: newsPaperList,
+            }),
           });
           if (response.status == 200) {
             //create action log for mail sent
             const actionLog = new ActionLog({
               user_ref: user_ref ? doc(db, "Users", user_ref) : null,
               islogin: false,
-              rodocref: mail.allocationRef, // each allocation doc ref
-              ronumber: mail.roNumber,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
               old_data: {},
               edited_data: {},
               user_role,
               action: 4,
-              message: `Manual Allocation sent  to newspaper mail sent to vendors Successfully to mail id ${mail.to} path: /advertisement${req.path}`,
+              message: `Manual Allocation sent  to newspaper mail sent to department Successfully to mail id ${to} path: /advertisement${req.path}`,
               status: "Success",
               platform: platform,
               networkip: clientIp || null,
@@ -1311,18 +1428,18 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
               adRef: adRef,
               actiontime: moment().tz("Asia/Kolkata").toDate(),
             });
-            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            const actionLogRef = await addActionLog({ ...actionLog });
           } else {
             const actionLog = new ActionLog({
               user_ref: user_ref ? doc(db, "Users", user_ref) : null,
               islogin: false,
-              rodocref: mail.allocationRef, // each allocation doc ref
-              ronumber: mail.roNumber,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
               old_data: {},
               edited_data: {},
               user_role,
               action: 4,
-              message: `Manual Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path}`,
+              message: `Manual Allocation sent  to newspaper mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
               status: "Failed",
               platform: platform,
               networkip: clientIp || null,
@@ -1336,9 +1453,9 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
               adRef: adRef,
               actiontime: moment().tz("Asia/Kolkata").toDate(),
             });
-            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            const actionLogRef = await addActionLog({ ...actionLog });
             try {
-              const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+              const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1347,7 +1464,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
                   actionName: " Manual allocation send to newspapers failed:  mail failed ",
                   actionEndpoint: `/advertisement${req.path}`,
                   ErrorInfo: {
-                    message: `Manual Allocation sent  to newspaper mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path}`,
+                    message: `Manual Allocation sent  to newspaper mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
                     error: null
                   },
                   userInfo: {
@@ -1365,112 +1482,11 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
               console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
             }
           }
-          console.log(`Email sent to ${mail.to}`, response);
-        } catch (err: any) {
-          console.error(`Failed to send email to ${mail.to}:`, err.message);
+          console.log(`Email sent to department`, to, response);
+        } catch (err: Error | any) {
+          console.error(`Failed to send email to ${to}:`, err.message);
         }
-
-      }
-      // Send mail to department
-      const advertisementNumber = adSnap.data().AdvertisementId || "";
-      const to = adSnap.data().Bearingno || "";
-      try {
-
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to,
-            // to: "jayanthbr@digi9.co.in",
-            advertisementNumber,
-            // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
-            cc: process.env.CC_MAIL,
-            listOfNewspapers: newsPaperList,
-          }),
-        });
-        if (response.status == 200) {
-          //create action log for mail sent
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Manual Allocation sent  to newspaper mail sent to department Successfully to mail id ${to} path: /advertisement${req.path}`,
-            status: "Success",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-          });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-        } else {
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Manual Allocation sent  to newspaper mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
-            status: "Failed",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-          });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-          try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: process.env.FAILED_LOG_TO_MAIL,
-                cc: process.env.FAILED_LOG_CC_MAIL,
-                actionName: " Manual allocation send to newspapers failed:  mail failed ",
-                actionEndpoint: `/advertisement${req.path}`,
-                ErrorInfo: {
-                  message: `Manual Allocation sent  to newspaper mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
-                  error: null
-                },
-                userInfo: {
-                  uesrId: req.body.user_ref,
-                  role: req.body.user_role,
-                  platform: req.body.platform,
-                  screen: req.body.screen
-                },
-                OtherInfo: {
-                  adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
-                }
-              }),
-            });
-          } catch (e) {
-            console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
-          }
-        }
-        console.log(`Email sent to department`, to, response);
-      } catch (err: Error | any) {
-        console.error(`Failed to send email to ${to}:`, err.message);
-      }
+      });
 
       editedData = { allotednewspapers: result.allotednewspapers };
       logStatus = "success";
@@ -1503,7 +1519,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
           adRef: allocRef,
           actiontime: moment().tz("Asia/Kolkata").toDate(),
         });
-        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        const actionLogRef = await addActionLog({ ...actionLog });
         actionLogRefs.push(actionLogRef.id);
       }
 
@@ -1545,11 +1561,11 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
           actiontime: moment().tz("Asia/Kolkata").toDate(),
           adRef: adRef,
         });
-        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        await addActionLog({ ...actionLog });
       }
 
       try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+        const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1580,7 +1596,7 @@ export const manualAllocationSendToNewspaper = async (req: Request, res: Respons
     }
   } catch (e: any) {
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1709,6 +1725,9 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
     const newsPaperList: string[] = [];
     try {
       // 🔹 Transaction
+      // Vendor user docs are read in parallel up front instead of one by one inside the transaction
+      const vendorSnaps = allotednewspapers.map((r: any) => (r ? getDoc(r as DocumentReference<DocumentData>) : null));
+      vendorSnaps.forEach((p) => p?.catch(() => {})); // errors still surface where awaited below
       const result = await runTransaction(db, async (transaction) => {
         // 1. Update Advertisement
         const updateResult = await transaction.update(adRef, {
@@ -1754,7 +1773,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
           transaction.set(allocationRef, allocationPayload);
           // console.log(`📰 Created allocation for vendor ${vendorDocRef}`);
           if (!vendorDocRef) continue;
-          const userSnap = await getDoc(vendorDocRef);
+          const userSnap = (await vendorSnaps[i])!;
           if (userSnap.exists()) {
             const userData = userSnap.data();
             if (userData) {
@@ -1819,103 +1838,105 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
         }
       }
       const advertisementNumber = adSnap.data().AdvertisementId || "";
-      try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to,
-            // to: "jayanthbr@digi9.co.in",
-            roNumber: advertisementNumber,
-            // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
-            cc: process.env.CC_MAIL,
-            listOfNewspapers: newsPaperList,
-            addressTo: "Technical Assistant",
-          }),
-        });
-        if (response.status == 200) {
-          //create action log for mail sent
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Automatic Allocation sent  to Deputy Director mail sent to department Successfully to mail id ${to} path: /advertisement${req.path}`,
-            status: "Success",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
+      runInBackground(async () => {
+        try {
+          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to,
+              // to: "jayanthbr@digi9.co.in",
+              roNumber: advertisementNumber,
+              // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
+              cc: process.env.CC_MAIL,
+              listOfNewspapers: newsPaperList,
+              addressTo: "Technical Assistant",
+            }),
           });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-        } else {
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Automatic Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
-            status: "Failed",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-          });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-          try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: process.env.FAILED_LOG_TO_MAIL,
-                cc: process.env.FAILED_LOG_CC_MAIL,
-                actionName: " Automatic allocation send to deputy failed to send mail",
-                actionEndpoint: `/advertisement${req.path}`,
-                ErrorInfo: {
-                  message: `Automatic Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
-                  error: null
-                },
-                userInfo: {
-                  uesrId: req.body.user_ref,
-                  role: req.body.user_role,
-                  platform: req.body.platform,
-                  screen: req.body.screen
-                },
-                OtherInfo: {
-                  adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
-                }
-              }),
+          if (response.status == 200) {
+            //create action log for mail sent
+            const actionLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 4,
+              message: `Automatic Allocation sent  to Deputy Director mail sent to department Successfully to mail id ${to} path: /advertisement${req.path}`,
+              status: "Success",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
             });
-          } catch (e) {
-            console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+            const actionLogRef = await addActionLog({ ...actionLog });
+          } else {
+            const actionLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 4,
+              message: `Automatic Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
+              status: "Failed",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
+            });
+            const actionLogRef = await addActionLog({ ...actionLog });
+            try {
+              const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: process.env.FAILED_LOG_TO_MAIL,
+                  cc: process.env.FAILED_LOG_CC_MAIL,
+                  actionName: " Automatic allocation send to deputy failed to send mail",
+                  actionEndpoint: `/advertisement${req.path}`,
+                  ErrorInfo: {
+                    message: `Automatic Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
+                    error: null
+                  },
+                  userInfo: {
+                    uesrId: req.body.user_ref,
+                    role: req.body.user_role,
+                    platform: req.body.platform,
+                    screen: req.body.screen
+                  },
+                  OtherInfo: {
+                    adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
+                  }
+                }),
+              });
+            } catch (e) {
+              console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+            }
           }
+          console.log(`Email sent to department`, to, response);
+        } catch (err: Error | any) {
+          console.error(`Failed to send email to ${to}:`, err.message);
         }
-        console.log(`Email sent to department`, to, response);
-      } catch (err: Error | any) {
-        console.error(`Failed to send email to ${to}:`, err.message);
-      }
+      });
 
       editedData = { allotednewspapers: result.allotednewspapers };
       logStatus = "success";
@@ -1948,7 +1969,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
           adRef: adRef,
           actiontime: moment().tz("Asia/Kolkata").toDate(),
         });
-        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        const actionLogRef = await addActionLog({ ...actionLog });
         actionLogRefs.push(actionLogRef.id);
       }
 
@@ -1990,11 +2011,11 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
           actiontime: moment().tz("Asia/Kolkata").toDate(),
           adRef: adRef,
         });
-        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        await addActionLog({ ...actionLog });
       }
 
       try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+        const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2026,7 +2047,7 @@ export const automaticAllocationSendToDeputy = async (req: Request, res: Respons
   } catch (e: Error | any) {
     try {
       console.log("Failed to send email to", process.env.FAILED_LOG_TO_MAIL);
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2164,6 +2185,9 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
     const newsPaperList: string[] = [];
     try {
       // 🔹 Transaction
+      // Vendor user docs are read in parallel up front instead of one by one inside the transaction
+      const vendorSnaps = allotednewspapers.map((r: any) => (r ? getDoc(r as DocumentReference<DocumentData>) : null));
+      vendorSnaps.forEach((p) => p?.catch(() => {})); // errors still surface where awaited below
       const result = await runTransaction(db, async (transaction) => {
         // 1. Update Advertisement
         const updateResult = await transaction.update(adRef, {
@@ -2209,7 +2233,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
           transaction.set(allocationRef, allocationPayload);
           // console.log(`📰 Created allocation for vendor ${vendorDocRef}`);
           if (!vendorDocRef) continue;
-          const userSnap = await getDoc(vendorDocRef);
+          const userSnap = (await vendorSnaps[i])!;
           if (userSnap.exists()) {
             const userData = userSnap.data();
             if (userData) {
@@ -2278,116 +2302,118 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
         }
       }
       const advertisementNumber = adSnap.data().AdvertisementId || "";
-      try {
-        // const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
-        //   method: "POST",
-        //   headers: { "Content-Type": "application/json" },
-        //   body: JSON.stringify({
-        //     to,
-        //     // to: "jayanthbr@digi9.co.in",
-        //     advertisementNumber,
-        //     cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
-        //     listOfNewspapers: newsPaperList,
-        //   }),
-        // });
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/approval-request`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to,
-            // to: "jayanthbr@digi9.co.in",
-            roNumber: advertisementNumber,
-            // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
-            // listOfNewspapers: newsPaperList,
-            articleTitle: adSnap.data().Subject || '',
+      runInBackground(async () => {
+        try {
+          // const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+          //   method: "POST",
+          //   headers: { "Content-Type": "application/json" },
+          //   body: JSON.stringify({
+          //     to,
+          //     // to: "jayanthbr@digi9.co.in",
+          //     advertisementNumber,
+          //     cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
+          //     listOfNewspapers: newsPaperList,
+          //   }),
+          // });
+          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/approval-request`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to,
+              // to: "jayanthbr@digi9.co.in",
+              roNumber: advertisementNumber,
+              // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
+              // listOfNewspapers: newsPaperList,
+              articleTitle: adSnap.data().Subject || '',
 
 
 
-          }),
-        });
-        if (response.status == 200) {
-          //create action log for mail sent
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Manual Allocation sent  to Deputy Director mail sent to department Successfully to mail id ${to} path: /advertisement${req.path}`,
-            status: "Success",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
+            }),
           });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-        } else {
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Manual Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
-            status: "Failed",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-          });
-          try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: process.env.FAILED_LOG_TO_MAIL,
-                cc: process.env.FAILED_LOG_CC_MAIL,
-                actionName: " Manual allocation send to deputy failed to send Mail",
-                actionEndpoint: `/advertisement${req.path}`,
-                ErrorInfo: {
-                  message: `Manual Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
-                  error: null,
-                },
-                userInfo: {
-                  uesrId: req.body.user_ref,
-                  role: req.body.user_role,
-                  platform: req.body.platform,
-                  screen: req.body.screen
-                },
-                OtherInfo: {
-                  adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
-                }
-              }),
+          if (response.status == 200) {
+            //create action log for mail sent
+            const actionLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 4,
+              message: `Manual Allocation sent  to Deputy Director mail sent to department Successfully to mail id ${to} path: /advertisement${req.path}`,
+              status: "Success",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
             });
-          } catch (e) {
-            console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+            const actionLogRef = await addActionLog({ ...actionLog });
+          } else {
+            const actionLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 4,
+              message: `Manual Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
+              status: "Failed",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
+            });
+            try {
+              const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: process.env.FAILED_LOG_TO_MAIL,
+                  cc: process.env.FAILED_LOG_CC_MAIL,
+                  actionName: " Manual allocation send to deputy failed to send Mail",
+                  actionEndpoint: `/advertisement${req.path}`,
+                  ErrorInfo: {
+                    message: `Manual Allocation sent  to Deputy Director mail sent to department Failed to mail id ${to} path: /advertisement${req.path}`,
+                    error: null,
+                  },
+                  userInfo: {
+                    uesrId: req.body.user_ref,
+                    role: req.body.user_role,
+                    platform: req.body.platform,
+                    screen: req.body.screen
+                  },
+                  OtherInfo: {
+                    adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
+                  }
+                }),
+              });
+            } catch (e) {
+              console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+            }
+            const actionLogRef = await addActionLog({ ...actionLog });
           }
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+          console.log(`Email sent to department`, to, response);
+        } catch (err: Error | any) {
+          console.error(`Failed to send email to ${to}:`, err.message);
         }
-        console.log(`Email sent to department`, to, response);
-      } catch (err: Error | any) {
-        console.error(`Failed to send email to ${to}:`, err.message);
-      }
+      });
 
       editedData = { allotednewspapers: result.allotednewspapers };
       logStatus = "success";
@@ -2420,7 +2446,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
           adRef: allocRef,
           actiontime: moment().tz("Asia/Kolkata").toDate(),
         });
-        const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        const actionLogRef = await addActionLog({ ...actionLog });
         actionLogRefs.push(actionLogRef.id);
       }
 
@@ -2462,10 +2488,10 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
           actiontime: moment().tz("Asia/Kolkata").toDate(),
           adRef: adRef,
         });
-        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        await addActionLog({ ...actionLog });
       }
       try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+        const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2496,7 +2522,7 @@ export const manualAllocationSendToDeputy = async (req: Request, res: Response) 
     }
   } catch (e: Error | any) {
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2564,8 +2590,12 @@ export const generateAdvertisementReport = async (req: Request, res: Response) =
     const toTs = Timestamp.fromDate(new Date(toDate));
     // console.log("fromTs", fromTs, "toTs", toTs);
 
-    const adsSnapshot = await getDocs(collection(db, "Advertisement"));
-    const ads = adsSnapshot.docs
+    // Filter by date in Firestore instead of downloading every advertisement; re-sort by id to keep the old row order
+    const adsSnapshot = await getDocs(
+      query(collection(db, "Advertisement"), where("DateOfApproval", ">=", fromTs), where("DateOfApproval", "<=", toTs))
+    );
+    const ads = [...adsSnapshot.docs]
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
       .map((d) => d.data())
       .filter((ad) => {
         const date = ad.DateOfApproval?.toDate ? ad.DateOfApproval.toDate() : ad.DateOfApproval;
@@ -2577,20 +2607,20 @@ export const generateAdvertisementReport = async (req: Request, res: Response) =
     }
 
     // Helper to fetch user display names
-    const fetchNames = async (refs = []) => {
-      const names = [];
-      for (const r of refs) {
-        try {
-          const docSnap = await getDoc(r);
-          if (docSnap.exists()) {
-            names.push((docSnap.data() as { display_name?: string }).display_name || "N/A");
-          }
-        } catch {
-          names.push("N/A");
-        }
+    // Fetched in parallel and cached per user, since the same newspapers repeat across ads
+    const nameCache = new Map<string, Promise<string | null>>();
+    const fetchName = (r: any): Promise<string | null> => {
+      const key = r?.path ?? String(r);
+      if (!nameCache.has(key)) {
+        nameCache.set(key, getDoc(r).then(
+          (docSnap) => (docSnap.exists() ? (docSnap.data() as { display_name?: string }).display_name || "N/A" : null),
+          () => "N/A"
+        ));
       }
-      return names;
+      return nameCache.get(key)!;
     };
+    const fetchNames = async (refs = []) =>
+      (await Promise.all(refs.map(fetchName))).filter((n): n is string => n !== null);
     const fetchNamesWithRONumber = async (refs = []) => {
       const names = [];
       for (const r of refs) {
@@ -2669,12 +2699,19 @@ export const generateAdvertisementReport = async (req: Request, res: Response) =
     drawRow(headers, y, true);
     y -= 20;
 
+    const adNames = await Promise.all(
+      ads.map((ad) =>
+        Promise.all([
+          ad.allotednewspapers ? fetchNames(ad.allotednewspapers) : [],
+          ad.approvednewspaperslocal ? fetchNames(ad.approvednewspaperslocal) : [],
+          ad.rejectednewspapers ? fetchNames(ad.rejectednewspapers) : [],
+        ])
+      )
+    );
+
     let sr = 1;
-    for (const ad of ads) {
-      console.log("Processing ad:", ad);
-      const alloted = ad.allotednewspapers ? await fetchNames(ad.allotednewspapers) : [];
-      const approved = ad.approvednewspaperslocal ? await fetchNames(ad.approvednewspaperslocal) : [];
-      const rejected = ad.rejectednewspapers ? await fetchNames(ad.rejectednewspapers) : [];
+    for (const [i, ad] of ads.entries()) {
+      const [alloted, approved, rejected] = adNames[i]!;
 
       const row = [
         sr.toString(),
@@ -2731,7 +2768,7 @@ export const getAdvertisementCountByYear = async (req: Request, res: Response) =
   try {
     const startDate = new Date(`${year}-01-01T00:00:00Z`);
     const endDate = new Date(`${year}-12-31T23:59:59Z`);
-    const querySnapshot = await getDocs(
+    const querySnapshot = await countDocs(
       query(
         collection(db, "Advertisement"),
         where("createdAt", ">=", Timestamp.fromDate(startDate)),
@@ -2748,7 +2785,7 @@ export const getAdvertisementCountByYear = async (req: Request, res: Response) =
       const start = new Date(Date.UTC(Number(year), i, 1, 0, 0, 0));
       const end = new Date(Date.UTC(Number(year), i + 1, 0, 23, 59, 59)); // handles variable month length automatically
 
-      return getDocs(
+      return countDocs(
         query(
           collection(db, "Advertisement"),
           where("createdAt", ">=", Timestamp.fromDate(start)),
@@ -2821,7 +2858,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
         actiontime: moment().tz("Asia/Kolkata").toDate(),
         adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
       });
-      await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      await addActionLog({ ...actionLog });
 
       const ListOfNewsPapperJobAllocationDocRef: DocumentReference[] = [];
       const jobAllocSnap = await getDocs(
@@ -2871,7 +2908,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
           actiontime: moment().tz("Asia/Kolkata").toDate(),
           adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
         });
-        await addDoc(collection(db, "actionLogs"), { ...actionLog });
+        await addActionLog({ ...actionLog });
 
         const allocationSnap = await getDoc(docRef);
         if (allocationSnap.exists()) {
@@ -2912,120 +2949,13 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
       }
 
       // Send mail to users
-      for (const mail of notifications) {
-        try {
-          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(mail),
-          });
-          if (response.status == 200) {
-            //create action log for mail sent
-            const actionLog = new ActionLog({
-              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-              islogin: false,
-              rodocref: mail.allocationRef, // each allocation doc ref
-              ronumber: mail.roNumber,
-              old_data: {},
-              edited_data: {},
-              user_role,
-              action: 4,
-              message: `Deputy Approve Advertisement mail sent to vendors Successfully to mail id ${mail.to} path: /advertisement${req.path}`,
-              status: "Success",
-              platform: platform,
-              networkip: clientIp || null,
-              screen,
-              Newspaper_allocation: {
-                Newspaper: [],
-                allotedtime: null,
-                allocation_type: null,
-                allotedby: null,
-              },
-              adRef: adRef,
-              actiontime: moment().tz("Asia/Kolkata").toDate(),
-            });
-            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-          } else {
-            const actionLog = new ActionLog({
-              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-              islogin: false,
-              rodocref: mail.allocationRef, // each allocation doc ref
-              ronumber: mail.roNumber,
-              old_data: {},
-              edited_data: {},
-              user_role,
-              action: 4,
-              message: `Deputy Approve Advertisement mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path} `,
-              status: "Failed",
-              platform: platform,
-              networkip: clientIp || null,
-              screen,
-              Newspaper_allocation: {
-                Newspaper: [],
-                allotedtime: null,
-                allocation_type: null,
-                allotedby: null,
-              },
-              adRef: adRef,
-              actiontime: moment().tz("Asia/Kolkata").toDate(),
-            });
-            const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-            try {
-              const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  to: process.env.FAILED_LOG_TO_MAIL,
-                  cc: process.env.FAILED_LOG_CC_MAIL,
-                  actionName: " Error while approving advertisement Deputy Failed to send Mail",
-                  actionEndpoint: `/advertisement${req.path}`,
-                  ErrorInfo: {
-                    message: `Deputy Approve Advertisement mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path} `,
-                    status: "Failed",
-                    error: null
-                  },
-                  userInfo: {
-                    uesrId: req.body.user_ref,
-                    role: req.body.user_role,
-                    platform: req.body.platform,
-                    screen: req.body.screen
-                  },
-                  OtherInfo: {
-                    adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
-                  }
-                }),
-              });
-            } catch (e) {
-              console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
-            }
-          }
-          console.log(`Email sent to ${mail.to}`);
-        } catch (err: any) {
-          console.error(`Failed to send email to ${mail.to}:`, err.message);
-        }
-      }
-
-      // Send mail to vendor
-      const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
-      if (!usersEmailSnap.empty) {
-        const docSnap = usersEmailSnap.docs[0];
-        if (!docSnap) {
-          throw new Error("UsersEmail document does not exist");
-        }
-        const usersEmailData = docSnap.data();
-        const toMail = usersEmailData["technicalassistantadvtgmailcom"];
-
-        for (const mail of notificationApproved) {
+      runInBackground(async () => {
+        await Promise.all(notifications.map(async (mail) => {
           try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
+            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/release-order`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: toMail,
-                roNumber: mail.roNumber,
-                result: mail.result,
-                resultComment: mail.resultComment,
-              }),
+              body: JSON.stringify(mail),
             });
             if (response.status == 200) {
               //create action log for mail sent
@@ -3038,7 +2968,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
                 edited_data: {},
                 user_role,
                 action: 4,
-                message: `Deputy Approve Advertisement Accepting email  sent to technical assistant Successfully to mail id ${toMail}  path: /advertisement${req.path}`,
+                message: `Deputy Approve Advertisement mail sent to vendors Successfully to mail id ${mail.to} path: /advertisement${req.path}`,
                 status: "Success",
                 platform: platform,
                 networkip: clientIp || null,
@@ -3052,7 +2982,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
                 adRef: adRef,
                 actiontime: moment().tz("Asia/Kolkata").toDate(),
               });
-              const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+              const actionLogRef = await addActionLog({ ...actionLog });
             } else {
               const actionLog = new ActionLog({
                 user_ref: user_ref ? doc(db, "Users", user_ref) : null,
@@ -3063,7 +2993,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
                 edited_data: {},
                 user_role,
                 action: 4,
-                message: `Deputy Approve Advertisement Accepting email  sent to technical assistant Failed to mail id ${toMail} path: /advertisement${req.path} `,
+                message: `Deputy Approve Advertisement mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path} `,
                 status: "Failed",
                 platform: platform,
                 networkip: clientIp || null,
@@ -3077,9 +3007,9 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
                 adRef: adRef,
                 actiontime: moment().tz("Asia/Kolkata").toDate(),
               });
-              const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
+              const actionLogRef = await addActionLog({ ...actionLog });
               try {
-                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -3088,7 +3018,8 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
                     actionName: " Error while approving advertisement Deputy Failed to send Mail",
                     actionEndpoint: `/advertisement${req.path}`,
                     ErrorInfo: {
-                      message: `Deputy Approve Advertisement Accepting email  sent to technical assistant Failed to mail id ${toMail} path: /advertisement${req.path} `,
+                      message: `Deputy Approve Advertisement mail sent to vendors Failed to mail id ${mail.to} path: /advertisement${req.path} `,
+                      status: "Failed",
                       error: null
                     },
                     userInfo: {
@@ -3106,111 +3037,223 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
                 console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
               }
             }
-            console.log(`Accepting email sent to ${toMail} for RO ${mail.roNumber}`);
+            console.log(`Email sent to ${mail.to}`);
           } catch (err: any) {
-            console.error(`Failed to send accepting email to ${toMail}:`, err.message);
+            console.error(`Failed to send email to ${mail.to}:`, err.message);
           }
+        }));
+      });
+
+      // Send mail to vendor
+      const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
+      if (!usersEmailSnap.empty) {
+        const docSnap = usersEmailSnap.docs[0];
+        if (!docSnap) {
+          throw new Error("UsersEmail document does not exist");
         }
+        const usersEmailData = docSnap.data();
+        const toMail = usersEmailData["technicalassistantadvtgmailcom"];
+
+        runInBackground(async () => {
+          await Promise.all(notificationApproved.map(async (mail) => {
+            try {
+              const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: toMail,
+                  roNumber: mail.roNumber,
+                  result: mail.result,
+                  resultComment: mail.resultComment,
+                }),
+              });
+              if (response.status == 200) {
+                //create action log for mail sent
+                const actionLog = new ActionLog({
+                  user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                  islogin: false,
+                  rodocref: mail.allocationRef, // each allocation doc ref
+                  ronumber: mail.roNumber,
+                  old_data: {},
+                  edited_data: {},
+                  user_role,
+                  action: 4,
+                  message: `Deputy Approve Advertisement Accepting email  sent to technical assistant Successfully to mail id ${toMail}  path: /advertisement${req.path}`,
+                  status: "Success",
+                  platform: platform,
+                  networkip: clientIp || null,
+                  screen,
+                  Newspaper_allocation: {
+                    Newspaper: [],
+                    allotedtime: null,
+                    allocation_type: null,
+                    allotedby: null,
+                  },
+                  adRef: adRef,
+                  actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addActionLog({ ...actionLog });
+              } else {
+                const actionLog = new ActionLog({
+                  user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                  islogin: false,
+                  rodocref: mail.allocationRef, // each allocation doc ref
+                  ronumber: mail.roNumber,
+                  old_data: {},
+                  edited_data: {},
+                  user_role,
+                  action: 4,
+                  message: `Deputy Approve Advertisement Accepting email  sent to technical assistant Failed to mail id ${toMail} path: /advertisement${req.path} `,
+                  status: "Failed",
+                  platform: platform,
+                  networkip: clientIp || null,
+                  screen,
+                  Newspaper_allocation: {
+                    Newspaper: [],
+                    allotedtime: null,
+                    allocation_type: null,
+                    allotedby: null,
+                  },
+                  adRef: adRef,
+                  actiontime: moment().tz("Asia/Kolkata").toDate(),
+                });
+                const actionLogRef = await addActionLog({ ...actionLog });
+                try {
+                  const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      to: process.env.FAILED_LOG_TO_MAIL,
+                      cc: process.env.FAILED_LOG_CC_MAIL,
+                      actionName: " Error while approving advertisement Deputy Failed to send Mail",
+                      actionEndpoint: `/advertisement${req.path}`,
+                      ErrorInfo: {
+                        message: `Deputy Approve Advertisement Accepting email  sent to technical assistant Failed to mail id ${toMail} path: /advertisement${req.path} `,
+                        error: null
+                      },
+                      userInfo: {
+                        uesrId: req.body.user_ref,
+                        role: req.body.user_role,
+                        platform: req.body.platform,
+                        screen: req.body.screen
+                      },
+                      OtherInfo: {
+                        adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
+                      }
+                    }),
+                  });
+                } catch (e) {
+                  console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+                }
+              }
+              console.log(`Accepting email sent to ${toMail} for RO ${mail.roNumber}`);
+            } catch (err: any) {
+              console.error(`Failed to send accepting email to ${toMail}:`, err.message);
+            }
+          }));
+        });
       }
 
       // Send mail to department
-      try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: data.Bearingno,
-            // to: "jayanthbr@digi9.co.in",
-            advertisementNumber: data.AdvertisementId,
-            // cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
-            // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
-            cc: process.env.CC_MAIL,
-            listOfNewspapers: newsPaperList,
-          }),
-        });
-        if (response.status == 200) {
-          //create action log for mail sent
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Deputy Approve Advertisementsent mail to department Successfully to mail id ${data.Bearingno} path: /advertisement${req.path}`,
-            status: "Success",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
+      runInBackground(async () => {
+        try {
+          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/informDept`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: data.Bearingno,
+              // to: "jayanthbr@digi9.co.in",
+              advertisementNumber: data.AdvertisementId,
+              // cc: "diprarunx@gmail.com,diprarunpub@gmail.com",
+              // cc: "diprarunadvt@gmail.com",//diprarunx@gmail.com,diprarunpub@gmail.com
+              cc: process.env.CC_MAIL,
+              listOfNewspapers: newsPaperList,
+            }),
           });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-        } else {
-          const actionLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Deputy Approve Advertisement mail sent to department Failed to mail id ${data.Bearingno} path: /advertisement${req.path}`,
-            status: "Failed",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-          });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-          try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: process.env.FAILED_LOG_TO_MAIL,
-                cc: process.env.FAILED_LOG_CC_MAIL,
-                actionName: " Error while approving advertisement Deputy Failed to send Mail",
-                actionEndpoint: `/advertisement${req.path}`,
-                ErrorInfo: {
-                  message: `Deputy Approve Advertisement mail sent to department Failed to mail id ${data.Bearingno} path: /advertisement${req.path}`,
-                  error: null
-                },
-                userInfo: {
-                  uesrId: req.body.user_ref,
-                  role: req.body.user_role,
-                  platform: req.body.platform,
-                  screen: req.body.screen
-                },
-                OtherInfo: {
-                  adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
-                }
-              }),
+          if (response.status == 200) {
+            //create action log for mail sent
+            const actionLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 4,
+              message: `Deputy Approve Advertisementsent mail to department Successfully to mail id ${data.Bearingno} path: /advertisement${req.path}`,
+              status: "Success",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
             });
-          } catch (e) {
-            console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+            const actionLogRef = await addActionLog({ ...actionLog });
+          } else {
+            const actionLog = new ActionLog({
+              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+              islogin: false,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 4,
+              message: `Deputy Approve Advertisement mail sent to department Failed to mail id ${data.Bearingno} path: /advertisement${req.path}`,
+              status: "Failed",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
+            });
+            const actionLogRef = await addActionLog({ ...actionLog });
+            try {
+              const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: process.env.FAILED_LOG_TO_MAIL,
+                  cc: process.env.FAILED_LOG_CC_MAIL,
+                  actionName: " Error while approving advertisement Deputy Failed to send Mail",
+                  actionEndpoint: `/advertisement${req.path}`,
+                  ErrorInfo: {
+                    message: `Deputy Approve Advertisement mail sent to department Failed to mail id ${data.Bearingno} path: /advertisement${req.path}`,
+                    error: null
+                  },
+                  userInfo: {
+                    uesrId: req.body.user_ref,
+                    role: req.body.user_role,
+                    platform: req.body.platform,
+                    screen: req.body.screen
+                  },
+                  OtherInfo: {
+                    adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
+                  }
+                }),
+              });
+            } catch (e) {
+              console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+            }
           }
+          console.log(`Email sent to department`, data.Bearingno);
+        } catch (err: Error | any) {
+          console.error(`Failed to send email to ${data.Bearingno}:`, err.message);
         }
-        console.log(`Email sent to department`, data.Bearingno);
-      } catch (err: Error | any) {
-        console.error(`Failed to send email to ${data.Bearingno}:`, err.message);
-      }
+      });
       //create Action log
       const actionLogSuccess = new ActionLog({
         user_ref: req.body.user_ref ? doc(db, "Users", req.body.user_ref) : null,
@@ -3235,7 +3278,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
         actiontime: moment().tz("Asia/Kolkata").toDate(),
         adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
       });
-      await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
+      await addActionLog({ ...actionLogSuccess });
       res.status(200).json({ success: true, message: "Advertisement approved and notifications sent.", Adevertisement: data, notifications, notificationApproved, ListOfNewsPapperJobAllocationDocRef });
 
     } catch (error: Error | any) {
@@ -3263,10 +3306,10 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
         actiontime: moment().tz("Asia/Kolkata").toDate(),
         adRef: adRef,
       });
-      await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      await addActionLog({ ...actionLog });
       console.error("❌ Error approving advertisement:", error);
       try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+        const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -3296,7 +3339,7 @@ export const deputyApproveAdvertisement = async (req: Request, res: Response) =>
     }
   } catch (e: Error | any) {
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3382,7 +3425,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
         actiontime: moment().tz("Asia/Kolkata").toDate(),
         adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
       });
-      await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      await addActionLog({ ...actionLog });
 
       const ListOfNewsPapperJobAllocationDocRef: DocumentReference[] = [];
       const jobAllocSnap = await getDocs(
@@ -3434,7 +3477,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
           actiontime: moment().tz("Asia/Kolkata").toDate(),
           adRef: adRef.id ? doc(db, "Advertisement", adRef.id) : null,
         });
-        await addDoc(collection(db, "actionLogs"), { ...allocationActionLog });
+        await addActionLog({ ...allocationActionLog });
 
         // read vendor email from newspaperrefuserref -> Users doc -> email
         const newspaperUserRef = old_data?.newspaperrefuserref;
@@ -3474,61 +3517,124 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
       const ccMail = data.Bearingno;
 
       // send pullback mail to each vendor
-      for (const vendor of uniqueVendorMailList) {
-        try {
-          const response = await fetch(
-            `${process.env.NODEMAILER_BASE_URL}/email/pullback`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                roNumber: vendor.roNumber,
-                to: vendor.to,
-                cc: ccMail
-              }),
+      runInBackground(async () => {
+        await Promise.all(uniqueVendorMailList.map(async (vendor) => {
+          try {
+            const response = await fetch(
+              `${process.env.NODEMAILER_BASE_URL}/email/pullback`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  roNumber: vendor.roNumber,
+                  to: vendor.to,
+                  cc: ccMail
+                }),
+              }
+            );
+
+            if (response.status === 200) {
+              const mailSuccessLog = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: null,
+
+                old_data: {},
+                edited_data: {
+
+                },
+                user_role: user_role || "",
+                action: 4,
+                message: `PullBack mail sent successfully to vendor ${vendor.to} for roNumber ${vendor.roNumber} path: /advertisement${req.path}`,
+                status: "Success",
+                platform,
+                networkip: clientIp || null,
+                screen,
+                Newspaper_allocation: {
+                  Newspaper: [],
+                  allotedtime: null,
+                  allocation_type: null,
+                  allotedby: null,
+                },
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+                adRef: adRef,
+              });
+
+              await addActionLog({ ...mailSuccessLog });
+            } else {
+              const mailFailedLog = new ActionLog({
+                user_ref: user_ref ? doc(db, "Users", user_ref) : null,
+                islogin: false,
+                rodocref: null,
+                old_data: {},
+                edited_data: {
+
+                },
+                user_role: user_role || "",
+                action: 4,
+                message: `PullBack mail failed to send to vendor ${vendor.to} for roNumber ${vendor.roNumber} path: /advertisement${req.path}`,
+                status: "Failed",
+                platform,
+                networkip: clientIp || null,
+                screen,
+                Newspaper_allocation: {
+                  Newspaper: [],
+                  allotedtime: null,
+                  allocation_type: null,
+                  allotedby: null,
+                },
+                actiontime: moment().tz("Asia/Kolkata").toDate(),
+                adRef: adRef,
+              });
+
+              await addActionLog({ ...mailFailedLog });
+
+              try {
+                backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    to: process.env.FAILED_LOG_TO_MAIL,
+                    cc: process.env.FAILED_LOG_CC_MAIL,
+                    actionName: " PullBack mail failed to send to vendor",
+                    actionEndpoint: `/advertisement${req.path}`,
+                    ErrorInfo: {
+                      message: `PullBack mail failed to send to vendor ${vendor.to} for roNumber ${vendor.roNumber}`,
+                      error: null,
+                    },
+                    userInfo: {
+                      uesrId: user_ref,
+                      role: user_role,
+                      platform,
+                      screen,
+                    },
+                    OtherInfo: {
+                      adRef: advertisementId
+                        ? doc(db, "Advertisement", advertisementId)
+                        : null,
+                      vendor,
+                    },
+                  }),
+                });
+              } catch (e) {
+                console.error(
+                  `Failed to send fail-log email to ${process.env.FAILED_LOG_TO_MAIL}:`,
+                  e
+                );
+              }
             }
-          );
-
-          if (response.status === 200) {
-            const mailSuccessLog = new ActionLog({
+          } catch (mailError: any) {
+            const mailCatchLog = new ActionLog({
               user_ref: user_ref ? doc(db, "Users", user_ref) : null,
               islogin: false,
               rodocref: null,
 
               old_data: {},
               edited_data: {
-
               },
               user_role: user_role || "",
               action: 4,
-              message: `PullBack mail sent successfully to vendor ${vendor.to} for roNumber ${vendor.roNumber} path: /advertisement${req.path}`,
-              status: "Success",
-              platform,
-              networkip: clientIp || null,
-              screen,
-              Newspaper_allocation: {
-                Newspaper: [],
-                allotedtime: null,
-                allocation_type: null,
-                allotedby: null,
-              },
-              actiontime: moment().tz("Asia/Kolkata").toDate(),
-              adRef: adRef,
-            });
-
-            await addDoc(collection(db, "actionLogs"), { ...mailSuccessLog });
-          } else {
-            const mailFailedLog = new ActionLog({
-              user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-              islogin: false,
-              rodocref: null,
-              old_data: {},
-              edited_data: {
-
-              },
-              user_role: user_role || "",
-              action: 4,
-              message: `PullBack mail failed to send to vendor ${vendor.to} for roNumber ${vendor.roNumber} path: /advertisement${req.path}`,
+              message: `Error while sending pullback mail to vendor ${vendor.to} for roNumber ${vendor.roNumber}: ${mailError.message} path: /advertisement${req.path}`,
               status: "Failed",
               platform,
               networkip: clientIp || null,
@@ -3543,20 +3649,20 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
               adRef: adRef,
             });
 
-            await addDoc(collection(db, "actionLogs"), { ...mailFailedLog });
+            await addActionLog({ ...mailCatchLog });
 
             try {
-              await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+              backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   to: process.env.FAILED_LOG_TO_MAIL,
                   cc: process.env.FAILED_LOG_CC_MAIL,
-                  actionName: " PullBack mail failed to send to vendor",
+                  actionName: " Error while sending pullback mail to vendor",
                   actionEndpoint: `/advertisement${req.path}`,
                   ErrorInfo: {
-                    message: `PullBack mail failed to send to vendor ${vendor.to} for roNumber ${vendor.roNumber}`,
-                    error: null,
+                    message: mailError.message,
+                    error: mailError,
                   },
                   userInfo: {
                     uesrId: user_ref,
@@ -3579,69 +3685,8 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
               );
             }
           }
-        } catch (mailError: any) {
-          const mailCatchLog = new ActionLog({
-            user_ref: user_ref ? doc(db, "Users", user_ref) : null,
-            islogin: false,
-            rodocref: null,
-
-            old_data: {},
-            edited_data: {
-            },
-            user_role: user_role || "",
-            action: 4,
-            message: `Error while sending pullback mail to vendor ${vendor.to} for roNumber ${vendor.roNumber}: ${mailError.message} path: /advertisement${req.path}`,
-            status: "Failed",
-            platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-            adRef: adRef,
-          });
-
-          await addDoc(collection(db, "actionLogs"), { ...mailCatchLog });
-
-          try {
-            await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: process.env.FAILED_LOG_TO_MAIL,
-                cc: process.env.FAILED_LOG_CC_MAIL,
-                actionName: " Error while sending pullback mail to vendor",
-                actionEndpoint: `/advertisement${req.path}`,
-                ErrorInfo: {
-                  message: mailError.message,
-                  error: mailError,
-                },
-                userInfo: {
-                  uesrId: user_ref,
-                  role: user_role,
-                  platform,
-                  screen,
-                },
-                OtherInfo: {
-                  adRef: advertisementId
-                    ? doc(db, "Advertisement", advertisementId)
-                    : null,
-                  vendor,
-                },
-              }),
-            });
-          } catch (e) {
-            console.error(
-              `Failed to send fail-log email to ${process.env.FAILED_LOG_TO_MAIL}:`,
-              e
-            );
-          }
-        }
-      }
+        }));
+      });
 
       const actionLogSuccess = new ActionLog({
         user_ref: user_ref ? doc(db, "Users", user_ref) : null,
@@ -3668,7 +3713,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
         actiontime: moment().tz("Asia/Kolkata").toDate(),
         adRef: adRef,
       });
-      await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
+      await addActionLog({ ...actionLogSuccess });
 
       res.status(200).json({
         success: true,
@@ -3701,11 +3746,11 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
         adRef: adRef,
       });
 
-      await addDoc(collection(db, "actionLogs"), { ...actionLog });
+      await addActionLog({ ...actionLog });
       console.error("❌ Error performing pullback advertisement:", error);
 
       try {
-        await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+        backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -3741,7 +3786,7 @@ export const deputyPullBackAction = async (req: Request, res: Response) => {
     }
   } catch (e: Error | any) {
     try {
-      await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3856,7 +3901,7 @@ export const deputyRejectAdvertisement = async (req: Request, res: Response) => 
         },
         note_sheet_allocation: null,
       });
-      await addDoc(collection(db, "actionLogs"), { ...actionLog })
+      await addActionLog({ ...actionLog })
 
       //mail send for acceptOrder
       const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
@@ -3873,105 +3918,107 @@ export const deputyRejectAdvertisement = async (req: Request, res: Response) => 
           message: "Email not found",
         });
       }
-      try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: toMail,
-            // to: "jayanthbr@digi9.co.in",
-            roNumber: data.AdvertisementId,
-            result: "rejected.",
-            resultComment: `Feedback : ${Feedback}`,
-          }),
-        });
-        if (response.status == 200) {
-          //create action log for mail sent
-          const actionLog = new ActionLog({
-            user_ref: user_id ? doc(db, "Users", user_id) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            docrefinvoice: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Advertisement Approved by Deputy mail sent successfully to department  ${toMail} path: /advertisement${req.path}`,
-            status: "Success",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-            note_sheet_allocation: null,
+      runInBackground(async () => {
+        try {
+          const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/accepting`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: toMail,
+              // to: "jayanthbr@digi9.co.in",
+              roNumber: data.AdvertisementId,
+              result: "rejected.",
+              resultComment: `Feedback : ${Feedback}`,
+            }),
           });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-        } else {
-          const actionLog = new ActionLog({
-            user_ref: user_id ? doc(db, "Users", user_id) : null,
-            islogin: false,
-            rodocref: null, // each allocation doc ref
-            ronumber: null,
-            docrefinvoice: null,
-            old_data: {},
-            edited_data: {},
-            user_role,
-            action: 4,
-            message: `Advertisement Approved by Deputy mail failed to send to department ${toMail} path: /advertisement${req.path}`,
-            status: "Failed",
-            platform: platform,
-            networkip: clientIp || null,
-            screen,
-            Newspaper_allocation: {
-              Newspaper: [],
-              allotedtime: null,
-              allocation_type: null,
-              allotedby: null,
-            },
-            adRef: adRef,
-            actiontime: moment().tz("Asia/Kolkata").toDate(),
-            note_sheet_allocation: null,
-          });
-          const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-          try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: process.env.FAILED_LOG_TO_MAIL,
-                cc: process.env.FAILED_LOG_CC_MAIL,
-                actionName: " Advertisement Rejected by Deputy failed to send mail",
-                actionEndpoint: `/advertisement${req.path}`,
-                ErrorInfo: {
-                  message: `Advertisement Approved by Deputy mail failed to send to department ${toMail} path: /advertisement${req.path}`,
-                  error: null,
-                },
-                userInfo: {
-                  uesrId: req.body.user_id,
-                  role: req.body.user_role,
-                  platform: req.body.platform,
-                  screen: req.body.screen
-                },
-                OtherInfo: {
-                  adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
-                }
-              }),
+          if (response.status == 200) {
+            //create action log for mail sent
+            const actionLog = new ActionLog({
+              user_ref: user_id ? doc(db, "Users", user_id) : null,
+              islogin: false,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
+              docrefinvoice: null,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 4,
+              message: `Advertisement Approved by Deputy mail sent successfully to department  ${toMail} path: /advertisement${req.path}`,
+              status: "Success",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
+              note_sheet_allocation: null,
             });
-          } catch (e) {
-            console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+            const actionLogRef = await addActionLog({ ...actionLog });
+          } else {
+            const actionLog = new ActionLog({
+              user_ref: user_id ? doc(db, "Users", user_id) : null,
+              islogin: false,
+              rodocref: null, // each allocation doc ref
+              ronumber: null,
+              docrefinvoice: null,
+              old_data: {},
+              edited_data: {},
+              user_role,
+              action: 4,
+              message: `Advertisement Approved by Deputy mail failed to send to department ${toMail} path: /advertisement${req.path}`,
+              status: "Failed",
+              platform: platform,
+              networkip: clientIp || null,
+              screen,
+              Newspaper_allocation: {
+                Newspaper: [],
+                allotedtime: null,
+                allocation_type: null,
+                allotedby: null,
+              },
+              adRef: adRef,
+              actiontime: moment().tz("Asia/Kolkata").toDate(),
+              note_sheet_allocation: null,
+            });
+            const actionLogRef = await addActionLog({ ...actionLog });
+            try {
+              const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: process.env.FAILED_LOG_TO_MAIL,
+                  cc: process.env.FAILED_LOG_CC_MAIL,
+                  actionName: " Advertisement Rejected by Deputy failed to send mail",
+                  actionEndpoint: `/advertisement${req.path}`,
+                  ErrorInfo: {
+                    message: `Advertisement Approved by Deputy mail failed to send to department ${toMail} path: /advertisement${req.path}`,
+                    error: null,
+                  },
+                  userInfo: {
+                    uesrId: req.body.user_id,
+                    role: req.body.user_role,
+                    platform: req.body.platform,
+                    screen: req.body.screen
+                  },
+                  OtherInfo: {
+                    adRef: advertisementId ? doc(db, "Advertisement", advertisementId) : null,
+                  }
+                }),
+              });
+            } catch (e) {
+              console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+            }
           }
         }
-      }
-      catch (error) {
-        console.error("Error sending email:", error);
-      }
+        catch (error) {
+          console.error("Error sending email:", error);
+        }
+      });
       // create action log
       const actionLogSuccess = new ActionLog({
         user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
@@ -3998,7 +4045,7 @@ export const deputyRejectAdvertisement = async (req: Request, res: Response) => 
         },
         note_sheet_allocation: null,
       });
-      await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess })
+      await addActionLog({ ...actionLogSuccess })
       res.status(200).json({ success: true, message: "Advertisement approved successfully", data: updatedData });
     } catch (error: Error | any) {
       // create action log
@@ -4027,10 +4074,10 @@ export const deputyRejectAdvertisement = async (req: Request, res: Response) => 
         },
         note_sheet_allocation: null,
       });
-      await addDoc(collection(db, "actionLogs"), { ...actionLog })
+      await addActionLog({ ...actionLog })
       console.error("❌ Error approving advertisement:", error);
       try {
-        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+        const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -4060,7 +4107,7 @@ export const deputyRejectAdvertisement = async (req: Request, res: Response) => 
     }
   } catch (e: Error | any) {
     try {
-      const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+      const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

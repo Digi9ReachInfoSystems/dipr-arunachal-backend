@@ -14,6 +14,7 @@ import {
 import type { Request, Response } from "express";
 import db from "../configs/firebase.js";
 import { AppError, handleError } from "../utils/errorHandler.js";
+import { countDocs } from "../utils/countDocs.js";
 import axios from "axios";
 
 export const getDashboardStats = async (req: Request, res: Response) => {
@@ -23,14 +24,17 @@ export const getDashboardStats = async (req: Request, res: Response) => {
         const adminDataRef = collection(db, "admindata");
         const approved_addRef = collection(db, "approved_add");
 
-        const usersSnapshot = await getDocs(query(usersRef));
+        // Users still needs full docs: "isVendor field missing" can't be expressed as a count query
+        const [usersSnapshot, vendorSnapshot, advertisementSnapshot, adminDataSnapshot, approved_addSnapshot] = await Promise.all([
+            getDocs(query(usersRef)),
+            countDocs(query(usersRef, where("isVendor", "==", true))),
+            countDocs(advertisementRef),
+            getDocs(adminDataRef),
+            countDocs(approved_addRef),
+        ]);
         const usersWithoutVendorField = usersSnapshot.docs.filter(doc =>
             !('isVendor' in doc.data())
         );
-        const vendorSnapshot = await getDocs(query(usersRef, where("isVendor", "==", true)))
-        const advertisementSnapshot = await getDocs(advertisementRef);
-        const adminDataSnapshot = await getDocs(adminDataRef);
-        const approved_addSnapshot = await getDocs(approved_addRef);
 
 
         const totalUsers = usersWithoutVendorField.length;

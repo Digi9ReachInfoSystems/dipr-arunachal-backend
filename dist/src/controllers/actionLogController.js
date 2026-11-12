@@ -1,7 +1,8 @@
 import ActionLog from "../models/actionLogModel.js";
 import db from "../configs/firebase.js";
-import { collection, doc, addDoc, getDocs, getDoc, deleteDoc, Timestamp, where, query, orderBy, QueryConstraint, and, } from "firebase/firestore";
+import { collection, doc, addDoc, getDocs, getDoc, deleteDoc, Timestamp, where, query, orderBy, QueryConstraint, and, limit as limitTo, } from "firebase/firestore";
 import { AppError, handleError } from "../utils/errorHandler.js";
+import { countDocs } from "../utils/countDocs.js";
 const actionLogsRef = collection(db, "actionLogs");
 // ✅ Create ActionLog
 export const createActionLog = async (req, res) => {
@@ -184,13 +185,16 @@ export const getAllActionLogs = async (req, res) => {
             constraints.push(where("actiontime", "<=", Timestamp.fromDate(endDate)));
         }
         constraints.push(orderBy("actiontime", "desc"));
-        const allSnap = await getDocs(query(actionLogsRef, ...constraints));
-        const allDocs = allSnap.docs;
-        const totalDocs = allDocs.length;
-        const totalPages = Math.ceil(totalDocs / Number(limit));
         const startIndex = (Number(page) - 1) * Number(limit);
         const endIndex = startIndex + Number(limit);
-        const pageDocs = allDocs.slice(startIndex, endIndex);
+        // Count on the server and fetch only up to the requested page instead of every matching log
+        const [countSnap, pageSnap] = await Promise.all([
+            countDocs(query(actionLogsRef, ...constraints)),
+            endIndex > 0 ? getDocs(query(actionLogsRef, ...constraints, limitTo(endIndex))) : null,
+        ]);
+        const totalDocs = countSnap.size;
+        const totalPages = Math.ceil(totalDocs / Number(limit));
+        const pageDocs = (pageSnap?.docs ?? []).slice(startIndex, endIndex);
         const logs = pageDocs.map((docSnap) => ({
             id: docSnap.id,
             ...docSnap.data(),
@@ -258,22 +262,23 @@ export const getSuccessFailureActionlogCounts = async (req, res) => {
         const actionLogsQuery = query(actionLogsRef, where("islogin", "==", false));
         const actionlogsSuccessQuery = query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"));
         const actionlogsFailureQuery = query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"));
-        const allSnap = await getDocs(actionLogsRef);
-        const allDocs = allSnap.docs;
-        const loginSnap = await getDocs(loginLogsQuery);
-        const successSnapshot = await getDocs(successQuery);
-        const failureSnapshot = await getDocs(failureQuery);
-        const loginSuccessSnapshot = await getDocs(loginSuccessQuery);
-        const loginFailureSnapshot = await getDocs(loginFailureQuery);
-        const actionlogsSnap = await getDocs(actionLogsQuery);
-        const actionlogsSuccessSnapshot = await getDocs(actionlogsSuccessQuery);
-        const actionlogsFailureSnapshot = await getDocs(actionlogsFailureQuery);
+        const [allSnap, loginSnap, successSnapshot, failureSnapshot, loginSuccessSnapshot, loginFailureSnapshot, actionlogsSnap, actionlogsSuccessSnapshot, actionlogsFailureSnapshot,] = await Promise.all([
+            countDocs(actionLogsRef),
+            countDocs(loginLogsQuery),
+            countDocs(successQuery),
+            countDocs(failureQuery),
+            countDocs(loginSuccessQuery),
+            countDocs(loginFailureQuery),
+            countDocs(actionLogsQuery),
+            countDocs(actionlogsSuccessQuery),
+            countDocs(actionlogsFailureQuery),
+        ]);
         const successCount = successSnapshot.size;
         const failureCount = failureSnapshot.size;
         const loginCount = loginSnap.size;
         const loginSuccessCount = loginSuccessSnapshot.size;
         const loginFailureCount = loginFailureSnapshot.size;
-        const totalCount = allDocs.length;
+        const totalCount = allSnap.size;
         res.status(200).json({
             success: true,
             totalLogs: totalCount,
@@ -310,15 +315,15 @@ export const getSuccessFailureActionlogCountsByYear = async (req, res) => {
             where("actiontime", "<=", endOfYear),
         ];
         const [allSnap, successSnap, failureSnap, loginSnap, loginSuccessSnap, loginFailureSnap, actionSnap, actionSuccessSnap, actionFailureSnap,] = await Promise.all([
-            getDocs(actionLogsRef),
-            getDocs(query(actionLogsRef, where("status", "==", "Success"), ...baseWhere)),
-            getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...baseWhere)),
-            getDocs(query(actionLogsRef, where("islogin", "==", true), ...baseWhere)),
-            getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...baseWhere)),
-            getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...baseWhere)),
-            getDocs(query(actionLogsRef, where("islogin", "==", false), ...baseWhere)),
-            getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...baseWhere)),
-            getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...baseWhere)),
+            countDocs(actionLogsRef),
+            countDocs(query(actionLogsRef, where("status", "==", "Success"), ...baseWhere)),
+            countDocs(query(actionLogsRef, where("status", "==", "Failed"), ...baseWhere)),
+            countDocs(query(actionLogsRef, where("islogin", "==", true), ...baseWhere)),
+            countDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...baseWhere)),
+            countDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...baseWhere)),
+            countDocs(query(actionLogsRef, where("islogin", "==", false), ...baseWhere)),
+            countDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...baseWhere)),
+            countDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...baseWhere)),
         ]);
         const yearlySummary = {
             totalLogs: allSnap.size,
@@ -345,15 +350,15 @@ export const getSuccessFailureActionlogCountsByYear = async (req, res) => {
             const end = new Date(Date.UTC(Number(year), i + 1, 0, 23, 59, 59));
             const commonWhere = [where("actiontime", ">=", start), where("actiontime", "<=", end)];
             return Promise.all([
-                getDocs(query(actionLogsRef, ...commonWhere)), // total
-                getDocs(query(actionLogsRef, where("status", "==", "Success"), ...commonWhere)),
-                getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...commonWhere)),
-                getDocs(query(actionLogsRef, where("islogin", "==", true), ...commonWhere)), // login total
-                getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...commonWhere)),
-                getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...commonWhere)),
-                getDocs(query(actionLogsRef, where("islogin", "==", false), ...commonWhere)), // action total
-                getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...commonWhere)),
-                getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...commonWhere)),
+                countDocs(query(actionLogsRef, ...commonWhere)), // total
+                countDocs(query(actionLogsRef, where("status", "==", "Success"), ...commonWhere)),
+                countDocs(query(actionLogsRef, where("status", "==", "Failed"), ...commonWhere)),
+                countDocs(query(actionLogsRef, where("islogin", "==", true), ...commonWhere)), // login total
+                countDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...commonWhere)),
+                countDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...commonWhere)),
+                countDocs(query(actionLogsRef, where("islogin", "==", false), ...commonWhere)), // action total
+                countDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...commonWhere)),
+                countDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...commonWhere)),
             ]).then(([total, success, failed, loginTotal, loginSuccess, loginFailed, actionTotal, actionSuccess, actionFailed,]) => ({
                 month,
                 total: total.size,
@@ -414,15 +419,15 @@ export const getSuccessFailureActionlogCountsByPlatformAndYear = async (req, res
                 where("actiontime", "<=", endOfYear),
             ];
             const [allSnap, successSnap, failureSnap, loginSnap, loginSuccessSnap, loginFailureSnap, actionSnap, actionSuccessSnap, actionFailureSnap,] = await Promise.all([
-                getDocs(query(actionLogsRef, ...baseFilters)),
-                getDocs(query(actionLogsRef, where("status", "==", "Success"), ...baseFilters)),
-                getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...baseFilters)),
-                getDocs(query(actionLogsRef, where("islogin", "==", true), ...baseFilters)),
-                getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...baseFilters)),
-                getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...baseFilters)),
-                getDocs(query(actionLogsRef, where("islogin", "==", false), ...baseFilters)),
-                getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...baseFilters)),
-                getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...baseFilters)),
+                countDocs(query(actionLogsRef, ...baseFilters)),
+                countDocs(query(actionLogsRef, where("status", "==", "Success"), ...baseFilters)),
+                countDocs(query(actionLogsRef, where("status", "==", "Failed"), ...baseFilters)),
+                countDocs(query(actionLogsRef, where("islogin", "==", true), ...baseFilters)),
+                countDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...baseFilters)),
+                countDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...baseFilters)),
+                countDocs(query(actionLogsRef, where("islogin", "==", false), ...baseFilters)),
+                countDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...baseFilters)),
+                countDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...baseFilters)),
             ]);
             const yearlySummary = {
                 platform,
@@ -450,15 +455,15 @@ export const getSuccessFailureActionlogCountsByPlatformAndYear = async (req, res
                     where("actiontime", "<=", end),
                 ];
                 const [totalSnap, successSnap, failSnap, loginTotalSnap, loginSuccessSnap, loginFailSnap, actionTotalSnap, actionSuccessSnap, actionFailSnap,] = await Promise.all([
-                    getDocs(query(actionLogsRef, ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("status", "==", "Success"), ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("islogin", "==", true), ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("islogin", "==", false), ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...monthFilter)),
+                    countDocs(query(actionLogsRef, ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("status", "==", "Success"), ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("status", "==", "Failed"), ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("islogin", "==", true), ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Success"), ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("islogin", "==", true), where("status", "==", "Failed"), ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("islogin", "==", false), ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Success"), ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("islogin", "==", false), where("status", "==", "Failed"), ...monthFilter)),
                 ]);
                 return {
                     month,
@@ -521,9 +526,9 @@ export const getSuccessFailureActionlogCountsByAllocationTypeAndYear = async (re
                 where("actiontime", "<=", endOfYear),
             ];
             const [allSnap, successSnap, failureSnap,] = await Promise.all([
-                getDocs(query(actionLogsRef, ...baseFilters)),
-                getDocs(query(actionLogsRef, where("status", "==", "Success"), ...baseFilters)),
-                getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...baseFilters)),
+                countDocs(query(actionLogsRef, ...baseFilters)),
+                countDocs(query(actionLogsRef, where("status", "==", "Success"), ...baseFilters)),
+                countDocs(query(actionLogsRef, where("status", "==", "Failed"), ...baseFilters)),
             ]);
             const yearlySummary = {
                 allocation_type,
@@ -541,9 +546,9 @@ export const getSuccessFailureActionlogCountsByAllocationTypeAndYear = async (re
                     where("actiontime", "<=", end),
                 ];
                 const [totalSnap, successSnap, failSnap] = await Promise.all([
-                    getDocs(query(actionLogsRef, ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("status", "==", "Success"), ...monthFilter)),
-                    getDocs(query(actionLogsRef, where("status", "==", "Failed"), ...monthFilter)),
+                    countDocs(query(actionLogsRef, ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("status", "==", "Success"), ...monthFilter)),
+                    countDocs(query(actionLogsRef, where("status", "==", "Failed"), ...monthFilter)),
                 ]);
                 return {
                     month,

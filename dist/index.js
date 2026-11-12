@@ -6,6 +6,7 @@ import axios from "axios";
 import os from "os";
 import createCryption from "./src/utils/Encryption.js";
 import createCryptionMiddleware from "./src/middlewares/encryption.js";
+import { requestContext } from "./src/utils/background.js";
 // Load env variables
 dotenv.config();
 const app = express();
@@ -50,6 +51,7 @@ app.use((req, _res, next) => {
     req.clientIp = clientIp;
     next();
 });
+app.use(requestContext);
 // Routes
 import actionLogRoute from "./src/routes/actionLogRoute.js";
 import newsPaperJobAllocationRoute from "./src/routes/newsPaperJobAllocationRoutes.js";

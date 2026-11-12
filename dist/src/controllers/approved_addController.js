@@ -1,6 +1,8 @@
 import { getFirestore, doc, getDoc, writeBatch, serverTimestamp, getDocs, collection, DocumentReference, Timestamp, query, where, updateDoc, setDoc, addDoc } from "firebase/firestore";
 import moment from "moment-timezone";
 import db from "../configs/firebase.js";
+import { countDocs } from "../utils/countDocs.js";
+import { addActionLog, backgroundFetch, runInBackground } from "../utils/background.js";
 import ActionLog from "../models/actionLogModel.js";
 export const getApproveAddCount = async (req, res) => {
     const { year } = req.params;
@@ -13,7 +15,7 @@ export const getApproveAddCount = async (req, res) => {
     try {
         const startDate = new Date(`${year}-01-01T00:00:00Z`);
         const endDate = new Date(`${year}-12-31T23:59:59Z`);
-        const querySnapshot = await getDocs(query(collection(db, "approved_add"), where("dateTimeAssistant", ">=", Timestamp.fromDate(startDate)), where("dateTimeAssistant", "<=", Timestamp.fromDate(endDate))));
+        const querySnapshot = await countDocs(query(collection(db, "approved_add"), where("dateTimeAssistant", ">=", Timestamp.fromDate(startDate)), where("dateTimeAssistant", "<=", Timestamp.fromDate(endDate))));
         const count = querySnapshot.size;
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
@@ -22,7 +24,7 @@ export const getApproveAddCount = async (req, res) => {
         const monthQueries = monthNames.map((month, i) => {
             const start = new Date(Date.UTC(Number(year), i, 1, 0, 0, 0));
             const end = new Date(Date.UTC(Number(year), i + 1, 0, 23, 59, 59)); // handles variable month length automatically
-            return getDocs(query(collection(db, "approved_add"), where("dateTimeAssistant", ">=", Timestamp.fromDate(start)), where("dateTimeAssistant", "<=", Timestamp.fromDate(end)))).then((snap) => ({
+            return countDocs(query(collection(db, "approved_add"), where("dateTimeAssistant", ">=", Timestamp.fromDate(start)), where("dateTimeAssistant", "<=", Timestamp.fromDate(end)))).then((snap) => ({
                 month,
                 count: snap.size,
             }));
@@ -181,7 +183,7 @@ export const createNoteSheet = async (req, res) => {
                 },
                 note_sheet_allocation: approved_addRef || null,
             });
-            await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            await addActionLog({ ...actionLog });
             // create document in bugdetDetails collection
             const budgetDetailsCollection = collection(db, "bugdetDetails");
             const budgetDetailsRef = doc(budgetDetailsCollection);
@@ -220,7 +222,7 @@ export const createNoteSheet = async (req, res) => {
                 },
                 note_sheet_allocation: approved_addRef || null,
             });
-            await addDoc(collection(db, "actionLogs"), { ...actionLogBudgetDetails });
+            await addActionLog({ ...actionLogBudgetDetails });
             //send mail to department
             //Increment admin notesheet number
             await updateDoc(adminRef, {
@@ -253,7 +255,7 @@ export const createNoteSheet = async (req, res) => {
                 },
                 note_sheet_allocation: approved_addRef || null,
             });
-            await addDoc(collection(db, "actionLogs"), { ...actionLogAdminData });
+            await addActionLog({ ...actionLogAdminData });
             //update user collection Data
             let existingApprovedList = userData.approvedlist || [];
             const filteredApprovedList = existingApprovedList.filter((item) => {
@@ -289,7 +291,7 @@ export const createNoteSheet = async (req, res) => {
                 },
                 note_sheet_allocation: approved_addRef || null,
             });
-            await addDoc(collection(db, "actionLogs"), { ...actionLogUserData });
+            await addActionLog({ ...actionLogUserData });
             const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
             const userEmailDocSnap = usersEmailSnap.docs[0];
             if (!userEmailDocSnap) {
@@ -298,107 +300,109 @@ export const createNoteSheet = async (req, res) => {
             const usersEmailData = userEmailDocSnap.data();
             let toMail = usersEmailData["ddipradvtgmailcom"];
             //create action log
-            try {
-                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/notesheetcreate`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        to: toMail,
-                        addressTo: (userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "",
-                        // to: "jayanthbr@digi9.co.in",
-                        notesheetNumber: `NS/DIPR-${noteSheetNo}`,
-                        amount: totalamount,
-                    }),
-                });
-                if (response.status == 200) {
-                    //create action log for mail sent
-                    const actionLog = new ActionLog({
-                        user_ref: user_id ? doc(db, "Users", user_id) : null,
-                        islogin: false,
-                        rodocref: null, // each allocation doc ref
-                        ronumber: null,
-                        docrefinvoice: null,
-                        old_data: {},
-                        edited_data: {},
-                        user_role,
-                        action: 4,
-                        message: `NoteSheet Created mail sent successfully to   ${toMail} path: /approvedAdd${req.path}`,
-                        status: "Success",
-                        platform: platform,
-                        networkip: clientIp || null,
-                        screen,
-                        Newspaper_allocation: {
-                            Newspaper: [],
-                            allotedtime: null,
-                            allocation_type: null,
-                            allotedby: null,
-                        },
-                        adRef: null,
-                        actiontime: moment().tz("Asia/Kolkata").toDate(),
-                        note_sheet_allocation: approved_addRef || null,
+            runInBackground(async () => {
+                try {
+                    const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/notesheetcreate`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            to: toMail,
+                            addressTo: (userData && typeof userData === "object" && "display_name" in userData) ? userData.display_name : "",
+                            // to: "jayanthbr@digi9.co.in",
+                            notesheetNumber: `NS/DIPR-${noteSheetNo}`,
+                            amount: totalamount,
+                        }),
                     });
-                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-                }
-                else {
-                    const actionLog = new ActionLog({
-                        user_ref: user_id ? doc(db, "Users", user_id) : null,
-                        islogin: false,
-                        rodocref: null, // each allocation doc ref
-                        ronumber: null,
-                        docrefinvoice: null,
-                        old_data: {},
-                        edited_data: {},
-                        user_role,
-                        action: 4,
-                        message: `NoteSheet Createdmail failed to send to  ${toMail} path: /approvedAdd${req.path}`,
-                        status: "Failed",
-                        platform: platform,
-                        networkip: clientIp || null,
-                        screen,
-                        Newspaper_allocation: {
-                            Newspaper: [],
-                            allotedtime: null,
-                            allocation_type: null,
-                            allotedby: null,
-                        },
-                        adRef: null,
-                        actiontime: moment().tz("Asia/Kolkata").toDate(),
-                        note_sheet_allocation: approved_addRef || null,
-                    });
-                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-                    try {
-                        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                to: process.env.FAILED_LOG_TO_MAIL,
-                                cc: process.env.FAILED_LOG_CC_MAIL,
-                                actionName: " NoteSheet Create failed to send mail",
-                                actionEndpoint: `/approvedAdd${req.path}`,
-                                ErrorInfo: {
-                                    message: `NoteSheet Createdmail failed to send to  ${toMail} path: /approvedAdd${req.path}`,
-                                    error: null,
-                                },
-                                userInfo: {
-                                    uesrId: req.body.user_id,
-                                    role: req.body.user_role,
-                                    platform: req.body.platform,
-                                    screen: req.body.screen
-                                },
-                                OtherInfo: {
-                                    newsPapperRef: newspaperUserId ? doc(db, "Users", newspaperUserId) : null,
-                                }
-                            }),
+                    if (response.status == 200) {
+                        //create action log for mail sent
+                        const actionLog = new ActionLog({
+                            user_ref: user_id ? doc(db, "Users", user_id) : null,
+                            islogin: false,
+                            rodocref: null, // each allocation doc ref
+                            ronumber: null,
+                            docrefinvoice: null,
+                            old_data: {},
+                            edited_data: {},
+                            user_role,
+                            action: 4,
+                            message: `NoteSheet Created mail sent successfully to   ${toMail} path: /approvedAdd${req.path}`,
+                            status: "Success",
+                            platform: platform,
+                            networkip: clientIp || null,
+                            screen,
+                            Newspaper_allocation: {
+                                Newspaper: [],
+                                allotedtime: null,
+                                allocation_type: null,
+                                allotedby: null,
+                            },
+                            adRef: null,
+                            actiontime: moment().tz("Asia/Kolkata").toDate(),
+                            note_sheet_allocation: approved_addRef || null,
                         });
+                        const actionLogRef = await addActionLog({ ...actionLog });
                     }
-                    catch (e) {
-                        console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+                    else {
+                        const actionLog = new ActionLog({
+                            user_ref: user_id ? doc(db, "Users", user_id) : null,
+                            islogin: false,
+                            rodocref: null, // each allocation doc ref
+                            ronumber: null,
+                            docrefinvoice: null,
+                            old_data: {},
+                            edited_data: {},
+                            user_role,
+                            action: 4,
+                            message: `NoteSheet Createdmail failed to send to  ${toMail} path: /approvedAdd${req.path}`,
+                            status: "Failed",
+                            platform: platform,
+                            networkip: clientIp || null,
+                            screen,
+                            Newspaper_allocation: {
+                                Newspaper: [],
+                                allotedtime: null,
+                                allocation_type: null,
+                                allotedby: null,
+                            },
+                            adRef: null,
+                            actiontime: moment().tz("Asia/Kolkata").toDate(),
+                            note_sheet_allocation: approved_addRef || null,
+                        });
+                        const actionLogRef = await addActionLog({ ...actionLog });
+                        try {
+                            const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    to: process.env.FAILED_LOG_TO_MAIL,
+                                    cc: process.env.FAILED_LOG_CC_MAIL,
+                                    actionName: " NoteSheet Create failed to send mail",
+                                    actionEndpoint: `/approvedAdd${req.path}`,
+                                    ErrorInfo: {
+                                        message: `NoteSheet Createdmail failed to send to  ${toMail} path: /approvedAdd${req.path}`,
+                                        error: null,
+                                    },
+                                    userInfo: {
+                                        uesrId: req.body.user_id,
+                                        role: req.body.user_role,
+                                        platform: req.body.platform,
+                                        screen: req.body.screen
+                                    },
+                                    OtherInfo: {
+                                        newsPapperRef: newspaperUserId ? doc(db, "Users", newspaperUserId) : null,
+                                    }
+                                }),
+                            });
+                        }
+                        catch (e) {
+                            console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+                        }
                     }
                 }
-            }
-            catch (error) {
-                console.error("Error sending email:", error);
-            }
+                catch (error) {
+                    console.error("Error sending email:", error);
+                }
+            });
             // create action log
             const actionLogSuccess = new ActionLog({
                 user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
@@ -425,7 +429,7 @@ export const createNoteSheet = async (req, res) => {
                 },
                 note_sheet_allocation: null,
             });
-            await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
+            await addActionLog({ ...actionLogSuccess });
             res.status(200).json({ success: true, message: "NoteSheet created successfully", notesheetno: noteSheetNo });
         }
         catch (error) {
@@ -455,10 +459,10 @@ export const createNoteSheet = async (req, res) => {
                 },
                 note_sheet_allocation: null,
             });
-            await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            await addActionLog({ ...actionLog });
             console.error("Error in Invoice_Request count:", error);
             try {
-                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -494,7 +498,7 @@ export const createNoteSheet = async (req, res) => {
     }
     catch (e) {
         try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+            const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -587,7 +591,7 @@ export const uploadSanctionletter = async (req, res) => {
                 },
                 note_sheet_allocation: approvedAdRef || null,
             });
-            await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            await addActionLog({ ...actionLog });
             //mail send to uploadSanction
             const usersEmailSnap = await getDocs(collection(db, "UsersEmail"));
             const userEmailDocSnap = usersEmailSnap.docs[0];
@@ -596,105 +600,107 @@ export const uploadSanctionletter = async (req, res) => {
             }
             const usersEmailData = userEmailDocSnap.data();
             let toMail = usersEmailData["diprarunaccgmailcom"];
-            try {
-                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/approvalSanction`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        to: toMail,
-                        // to: "jayanthbr@digi9.co.in",
-                        notesheetNumber: approvedAdData.notesheetString,
-                    }),
-                });
-                if (response.status == 200) {
-                    //create action log for mail sent
-                    const actionLog = new ActionLog({
-                        user_ref: user_id ? doc(db, "Users", user_id) : null,
-                        islogin: false,
-                        rodocref: null, // each allocation doc ref
-                        ronumber: null,
-                        docrefinvoice: null,
-                        old_data: {},
-                        edited_data: {},
-                        user_role,
-                        action: 4,
-                        message: `Uploaded sanction letter by assistant  mail sent successfully to department  ${toMail} path: /approvedAdd${req.path}`,
-                        status: "Success",
-                        platform: platform,
-                        networkip: clientIp || null,
-                        screen,
-                        Newspaper_allocation: {
-                            Newspaper: [],
-                            allotedtime: null,
-                            allocation_type: null,
-                            allotedby: null,
-                        },
-                        adRef: null,
-                        actiontime: moment().tz("Asia/Kolkata").toDate(),
-                        note_sheet_allocation: approvedAdRef || null,
+            runInBackground(async () => {
+                try {
+                    const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/email/approvalSanction`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            to: toMail,
+                            // to: "jayanthbr@digi9.co.in",
+                            notesheetNumber: approvedAdData.notesheetString,
+                        }),
                     });
-                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-                }
-                else {
-                    const actionLog = new ActionLog({
-                        user_ref: user_id ? doc(db, "Users", user_id) : null,
-                        islogin: false,
-                        rodocref: null, // each allocation doc ref
-                        ronumber: null,
-                        docrefinvoice: null,
-                        old_data: {},
-                        edited_data: {},
-                        user_role,
-                        action: 4,
-                        message: `Uploaded sanction letter by assistant    mail failed to send to department ${toMail}  path: /approvedAdd${req.path}`,
-                        status: "Failed",
-                        platform: platform,
-                        networkip: clientIp || null,
-                        screen,
-                        Newspaper_allocation: {
-                            Newspaper: [],
-                            allotedtime: null,
-                            allocation_type: null,
-                            allotedby: null,
-                        },
-                        adRef: null,
-                        actiontime: moment().tz("Asia/Kolkata").toDate(),
-                        note_sheet_allocation: approvedAdRef || null,
-                    });
-                    const actionLogRef = await addDoc(collection(db, "actionLogs"), { ...actionLog });
-                    try {
-                        const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                to: process.env.FAILED_LOG_TO_MAIL,
-                                cc: process.env.FAILED_LOG_CC_MAIL,
-                                actionName: " Upload Sanction letter by assistant failed to send  mail",
-                                actionEndpoint: `/approvedAdd${req.path}`,
-                                ErrorInfo: {
-                                    message: `Uploaded sanction letter by assistant    mail failed to send to department ${toMail}  path: /approvedAdd${req.path}`,
-                                    error: null,
-                                },
-                                userInfo: {
-                                    uesrId: req.body.user_id,
-                                    role: req.body.user_role,
-                                    platform: req.body.platform,
-                                    screen: req.body.screen
-                                },
-                                OtherInfo: {
-                                    approvedAdRef: approvedAdId ? doc(db, "approved_add", approvedAdId) : null,
-                                }
-                            }),
+                    if (response.status == 200) {
+                        //create action log for mail sent
+                        const actionLog = new ActionLog({
+                            user_ref: user_id ? doc(db, "Users", user_id) : null,
+                            islogin: false,
+                            rodocref: null, // each allocation doc ref
+                            ronumber: null,
+                            docrefinvoice: null,
+                            old_data: {},
+                            edited_data: {},
+                            user_role,
+                            action: 4,
+                            message: `Uploaded sanction letter by assistant  mail sent successfully to department  ${toMail} path: /approvedAdd${req.path}`,
+                            status: "Success",
+                            platform: platform,
+                            networkip: clientIp || null,
+                            screen,
+                            Newspaper_allocation: {
+                                Newspaper: [],
+                                allotedtime: null,
+                                allocation_type: null,
+                                allotedby: null,
+                            },
+                            adRef: null,
+                            actiontime: moment().tz("Asia/Kolkata").toDate(),
+                            note_sheet_allocation: approvedAdRef || null,
                         });
+                        const actionLogRef = await addActionLog({ ...actionLog });
                     }
-                    catch (e) {
-                        console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+                    else {
+                        const actionLog = new ActionLog({
+                            user_ref: user_id ? doc(db, "Users", user_id) : null,
+                            islogin: false,
+                            rodocref: null, // each allocation doc ref
+                            ronumber: null,
+                            docrefinvoice: null,
+                            old_data: {},
+                            edited_data: {},
+                            user_role,
+                            action: 4,
+                            message: `Uploaded sanction letter by assistant    mail failed to send to department ${toMail}  path: /approvedAdd${req.path}`,
+                            status: "Failed",
+                            platform: platform,
+                            networkip: clientIp || null,
+                            screen,
+                            Newspaper_allocation: {
+                                Newspaper: [],
+                                allotedtime: null,
+                                allocation_type: null,
+                                allotedby: null,
+                            },
+                            adRef: null,
+                            actiontime: moment().tz("Asia/Kolkata").toDate(),
+                            note_sheet_allocation: approvedAdRef || null,
+                        });
+                        const actionLogRef = await addActionLog({ ...actionLog });
+                        try {
+                            const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    to: process.env.FAILED_LOG_TO_MAIL,
+                                    cc: process.env.FAILED_LOG_CC_MAIL,
+                                    actionName: " Upload Sanction letter by assistant failed to send  mail",
+                                    actionEndpoint: `/approvedAdd${req.path}`,
+                                    ErrorInfo: {
+                                        message: `Uploaded sanction letter by assistant    mail failed to send to department ${toMail}  path: /approvedAdd${req.path}`,
+                                        error: null,
+                                    },
+                                    userInfo: {
+                                        uesrId: req.body.user_id,
+                                        role: req.body.user_role,
+                                        platform: req.body.platform,
+                                        screen: req.body.screen
+                                    },
+                                    OtherInfo: {
+                                        approvedAdRef: approvedAdId ? doc(db, "approved_add", approvedAdId) : null,
+                                    }
+                                }),
+                            });
+                        }
+                        catch (e) {
+                            console.error(`Failed to send email to ${process.env.FAILED_LOG_TO_MAIL}:`, e);
+                        }
                     }
                 }
-            }
-            catch (error) {
-                console.error("Error sending email:", error);
-            }
+                catch (error) {
+                    console.error("Error sending email:", error);
+                }
+            });
             //create action log
             const actionLogSuccess = new ActionLog({
                 user_ref: req.body.user_id ? doc(db, "Users", req.body.user_id) : null,
@@ -721,7 +727,7 @@ export const uploadSanctionletter = async (req, res) => {
                 },
                 note_sheet_allocation: approvedAdRef || null,
             });
-            await addDoc(collection(db, "actionLogs"), { ...actionLogSuccess });
+            await addActionLog({ ...actionLogSuccess });
             res.status(200).json({ success: true, message: "Sanction letter uploaded successfully by assistant" });
         }
         catch (error) {
@@ -751,10 +757,10 @@ export const uploadSanctionletter = async (req, res) => {
                 },
                 note_sheet_allocation: approvedAdRef || null,
             });
-            await addDoc(collection(db, "actionLogs"), { ...actionLog });
+            await addActionLog({ ...actionLog });
             console.error("Error in Invoice_Request count:", error);
             try {
-                const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+                const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -790,7 +796,7 @@ export const uploadSanctionletter = async (req, res) => {
     }
     catch (e) {
         try {
-            const response = await fetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
+            const response = backgroundFetch(`${process.env.NODEMAILER_BASE_URL}/send/fail-log`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
